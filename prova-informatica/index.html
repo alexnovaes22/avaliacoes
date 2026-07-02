@@ -1,1 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prova Online — Informática</title>
+<!--
+================================================================================
+ PROVA ONLINE COM ENVIO POR E-MAIL (FormSubmit.co)
+ Prof. Me. Alex Ferreira Novaes
+--------------------------------------------------------------------------------
+ COMO CONFIGURAR (3 passos):
 
+ 1. Troque "SEU-EMAIL-AQUI@gmail.com" na constante EMAIL_PROFESSOR (logo abaixo,
+    na seção CONFIGURAÇÃO) pelo seu e-mail real.
+
+ 2. ATIVAÇÃO: na PRIMEIRA vez que alguém enviar a prova, o FormSubmit manda um
+    e-mail de confirmação para você ("Activate Form"). Clique no link UMA vez.
+    Dica: faça você mesmo um envio de teste antes de liberar aos alunos.
+
+ 3. (Recomendado) Após ativar, o FormSubmit informa um código aleatório do tipo
+    "a1b2c3d4e5". Substitua o e-mail pelo código na constante EMAIL_PROFESSOR
+    (ex.: "a1b2c3d4e5"). Assim seu e-mail NÃO fica visível no código-fonte
+    para os alunos.
+
+ PARA EDITAR A PROVA: altere apenas TITULO_PROVA, DISCIPLINA e o array QUESTOES.
+ Em cada questão, "correta" é o índice da alternativa certa (0 = A, 1 = B...).
+
+ O e-mail chega em formato de tabela com: nome, turma, nota, cada resposta
+ corrigida e uma linha "RESUMO_EXCEL" (valores separados por ponto e vírgula)
+ pronta para colar no Excel: Dados > Texto para Colunas > Delimitado > ";".
+================================================================================
+-->
+<style>
+  :root{
+    --tinta:#1b2733;
+    --papel:#f6f7f9;
+    --cartao:#ffffff;
+    --marinho:#153e5c;
+    --marinho-escuro:#0e2c42;
+    --destaque:#0e7c66;
+    --erro:#b3372f;
+    --linha:#d8dee6;
+    --cinza:#5b6875;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:Georgia,'Times New Roman',serif;
+    background:var(--papel);
+    color:var(--tinta);
+    line-height:1.55;
+    padding:24px 12px 64px;
+  }
+  .folha{
+    max-width:820px;margin:0 auto;background:var(--cartao);
+    border:1px solid var(--linha);border-top:6px solid var(--marinho);
+    border-radius:6px;box-shadow:0 2px 10px rgba(20,40,60,.07);
+    padding:32px clamp(18px,5vw,48px) 40px;
+  }
+  .cabecalho{border-bottom:2px solid var(--marinho);padding-bottom:16px;margin-bottom:22px;}
+  .cabecalho .instituicao{
+    font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--cinza);margin-bottom:6px;
+  }
+  .cabecalho h1{font-size:clamp(20px,4vw,27px);color:var(--marinho-escuro);font-weight:700;}
+  .cabecalho .disciplina{font-style:italic;color:var(--cinza);margin-top:4px;font-size:15px;}
+  .instrucoes{
+    background:#eef3f7;border-left:4px solid var(--marinho);border-radius:0 4px 4px 0;
+    padding:12px 16px;font-size:14px;margin-bottom:24px;color:#2c3e50;
+  }
+  .instrucoes strong{color:var(--marinho-escuro);}
+  fieldset{border:none;margin-bottom:26px;}
+  .identificacao{
+    display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:8px;
+  }
+  @media(max-width:560px){.identificacao{grid-template-columns:1fr;}}
+  label.rotulo{
+    display:block;font-family:Arial,Helvetica,sans-serif;font-size:11px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--cinza);margin-bottom:5px;
+  }
+  input[type=text]{
+    width:100%;padding:10px 12px;font-size:16px;font-family:inherit;
+    border:1px solid var(--linha);border-radius:4px;background:#fcfdfe;color:var(--tinta);
+  }
+  input[type=text]:focus{outline:2px solid var(--marinho);outline-offset:1px;}
+  .questao{
+    border:1px solid var(--linha);border-radius:6px;padding:18px 20px;margin-bottom:18px;
+    background:#fdfdfd;
+  }
+  .questao .num{
+    font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:13px;
+    color:var(--marinho);letter-spacing:.06em;margin-bottom:6px;
+  }
+  .questao .enunciado{font-size:16.5px;margin-bottom:12px;}
+  .alt{
+    display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:4px;
+    cursor:pointer;border:1px solid transparent;
+  }
+  .alt:hover{background:#eef3f7;}
+  .alt input{margin-top:4px;accent-color:var(--marinho);cursor:pointer;flex-shrink:0;}
+  .alt .letra{font-weight:700;color:var(--marinho);font-family:Arial,sans-serif;font-size:14px;margin-top:1px;}
+  .alt span.texto{font-size:15.5px;}
+  .alt.pendente{border-color:var(--erro);background:#fdf1f0;}
+  .rodape{
+    display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;
+    border-top:2px solid var(--marinho);padding-top:20px;margin-top:8px;
+  }
+  .aviso-pendencia{color:var(--erro);font-size:14px;font-style:italic;display:none;}
+  button.enviar{
+    font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;
+    letter-spacing:.05em;text-transform:uppercase;color:#fff;background:var(--marinho);
+    border:none;border-radius:5px;padding:14px 34px;cursor:pointer;
+  }
+  button.enviar:hover{background:var(--marinho-escuro);}
+  button.enviar:disabled{background:#9aa7b2;cursor:wait;}
+  /* Tela de confirmação */
+  .confirmacao{text-align:center;padding:48px 20px;}
+  .confirmacao .selo{
+    width:74px;height:74px;border-radius:50%;background:var(--destaque);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 18px;
+  }
+  .confirmacao h2{color:var(--marinho-escuro);margin-bottom:10px;}
+  .confirmacao p{color:var(--cinza);}
+  .oculto{display:none!important;}
+  @media print{body{background:#fff;padding:0}.folha{border:none;box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="folha">
+
+  <!-- ===================== TELA DE CONFIRMAÇÃO (pós-envio) ===================== -->
+  <div id="telaConfirmacao" class="confirmacao oculto">
+    <div class="selo">✓</div>
+    <h2>Prova enviada com sucesso!</h2>
+    <p>Suas respostas foram registradas e encaminhadas ao professor.<br>
+    Você já pode fechar esta janela.</p>
+  </div>
+
+  <!-- ============================ PROVA ============================ -->
+  <div id="telaProva">
+    <header class="cabecalho">
+      <p class="instituicao">CEEP &middot; Avaliação Online</p>
+      <h1 id="tituloProva">Prova Bimestral</h1>
+      <p class="disciplina" id="disciplinaProva">Informática</p>
+    </header>
+
+    <div class="instrucoes">
+      <strong>Instruções:</strong> preencha seu nome completo e turma, responda todas as
+      questões e clique em <strong>Enviar prova</strong>. A ordem das questões e das
+      alternativas é diferente para cada aluno. Só é possível enviar uma vez —
+      revise antes de confirmar.
+    </div>
+
+    <form id="formProva" method="POST" accept-charset="UTF-8">
+      <fieldset class="identificacao">
+        <div>
+          <label class="rotulo" for="nomeAluno">Nome completo</label>
+          <input type="text" id="nomeAluno" name="Nome" required autocomplete="off">
+        </div>
+        <div>
+          <label class="rotulo" for="turmaAluno">Turma</label>
+          <input type="text" id="turmaAluno" name="Turma" required autocomplete="off">
+        </div>
+      </fieldset>
+
+      <div id="areaQuestoes"><!-- questões geradas via JS --></div>
+
+      <div class="rodape">
+        <p class="aviso-pendencia" id="avisoPendencia">
+          Há questões sem resposta (destacadas em vermelho) ou campos de identificação vazios.
+        </p>
+        <button type="submit" class="enviar" id="btnEnviar">Enviar prova</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURAÇÃO — edite apenas esta seção
+   ============================================================ */
+const EMAIL_PROFESSOR = "SEU-EMAIL-AQUI@gmail.com"; // troque pelo seu e-mail (ou pelo código FormSubmit após ativar)
+const TITULO_PROVA    = "Prova Bimestral — 2º Bimestre";
+const DISCIPLINA      = "Informática — Prof. Me. Alex Ferreira Novaes";
+
+/* Cada questão: enunciado, alternativas, e "correta" = índice da certa (0=A, 1=B, 2=C, 3=D) */
+const QUESTOES = [
+  {
+    enunciado: "No Microsoft Excel, qual fórmula soma corretamente os valores do intervalo de B2 até B10?",
+    alternativas: ["=SOMA(B2:B10)", "=SOMAR(B2-B10)", "=TOTAL(B2;B10)", "=ADICIONA(B2:B10)"],
+    correta: 0
+  },
+  {
+    enunciado: "Qual das opções abaixo é um exemplo de hardware?",
+    alternativas: ["Sistema operacional Windows", "Planilha do Excel", "Memória RAM", "Navegador Google Chrome"],
+    correta: 2
+  },
+  {
+    enunciado: "O atalho de teclado utilizado para copiar um conteúdo selecionado é:",
+    alternativas: ["Ctrl + V", "Ctrl + C", "Ctrl + X", "Ctrl + Z"],
+    correta: 1
+  },
+  {
+    enunciado: "Na internet, o protocolo HTTPS indica que a conexão entre o navegador e o site é:",
+    alternativas: ["Mais rápida que o normal", "Criptografada e mais segura", "Gratuita e sem anúncios", "Exclusiva para redes sociais"],
+    correta: 1
+  },
+  {
+    enunciado: "Qual extensão de arquivo corresponde a uma apresentação de slides do PowerPoint?",
+    alternativas: [".xlsx", ".docx", ".pptx", ".pdf"],
+    correta: 2
+  }
+];
+/* ============================================================
+   FIM DA CONFIGURAÇÃO — não é necessário editar abaixo
+   ============================================================ */
+
+const LETRAS = ["A","B","C","D","E","F"];
+document.getElementById("tituloProva").textContent = TITULO_PROVA;
+document.getElementById("disciplinaProva").textContent = DISCIPLINA;
+document.title = TITULO_PROVA;
+
+/* Tela de confirmação após retorno do FormSubmit */
+if (new URLSearchParams(location.search).get("enviado") === "1") {
+  document.getElementById("telaProva").classList.add("oculto");
+  document.getElementById("telaConfirmacao").classList.remove("oculto");
+}
+
+/* Embaralhamento (Fisher-Yates) — ordem única por sessão */
+function embaralhar(arr){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* Monta a prova: embaralha questões e alternativas, guardando o mapeamento */
+const ordem = embaralhar(QUESTOES.map((q, idx) => {
+  const alts = embaralhar(q.alternativas.map((texto, i) => ({texto, original: i})));
+  return { idOriginal: idx + 1, enunciado: q.enunciado, alts, corretaOriginal: q.correta };
+}));
+
+const area = document.getElementById("areaQuestoes");
+ordem.forEach((q, pos) => {
+  const bloco = document.createElement("div");
+  bloco.className = "questao";
+  bloco.dataset.pos = pos;
+  let html = '<p class="num">QUESTÃO ' + String(pos + 1).padStart(2, "0") + '</p>' +
+             '<p class="enunciado">' + q.enunciado + '</p>';
+  q.alts.forEach((alt, i) => {
+    html += '<label class="alt">' +
+      '<input type="radio" name="resp_' + pos + '" value="' + alt.original + '">' +
+      '<span class="letra">' + LETRAS[i] + ')</span>' +
+      '<span class="texto">' + alt.texto + '</span></label>';
+  });
+  bloco.innerHTML = html;
+  area.appendChild(bloco);
+});
+
+/* Envio: valida, corrige, monta os campos do e-mail e faz o POST ao FormSubmit */
+const form = document.getElementById("formProva");
+form.addEventListener("submit", function (ev) {
+  ev.preventDefault();
+
+  const nome  = document.getElementById("nomeAluno").value.trim();
+  const turma = document.getElementById("turmaAluno").value.trim();
+  const aviso = document.getElementById("avisoPendencia");
+  let pendente = false;
+
+  document.querySelectorAll(".questao").forEach(bloco => {
+    const pos = bloco.dataset.pos;
+    const marcada = form.querySelector('input[name="resp_' + pos + '"]:checked');
+    bloco.querySelectorAll(".alt").forEach(l => l.classList.remove("pendente"));
+    if (!marcada) {
+      pendente = true;
+      bloco.querySelectorAll(".alt").forEach(l => l.classList.add("pendente"));
+    }
+  });
+  if (!nome || !turma) pendente = true;
+
+  if (pendente) {
+    aviso.style.display = "block";
+    const primeira = document.querySelector(".alt.pendente");
+    if (primeira) primeira.scrollIntoView({behavior: "smooth", block: "center"});
+    return;
+  }
+  aviso.style.display = "none";
+
+  /* Correção automática */
+  let acertos = 0;
+  const respostas = [];   // na ordem ORIGINAL das questões (Q1, Q2, ...)
+  ordem.forEach(q => {
+    const pos = ordem.indexOf(q);
+    const marcada = form.querySelector('input[name="resp_' + pos + '"]:checked');
+    const escolhida = parseInt(marcada.value, 10);            // índice original da alternativa
+    const acertou = escolhida === q.corretaOriginal;
+    if (acertou) acertos++;
+    respostas.push({
+      questao: q.idOriginal,
+      letraOriginal: LETRAS[escolhida],
+      letraGabarito: LETRAS[q.corretaOriginal],
+      acertou
+    });
+  });
+  respostas.sort((a, b) => a.questao - b.questao);
+  const nota = (acertos / QUESTOES.length * 10).toFixed(1).replace(".", ",");
+
+  /* Campos que chegarão no e-mail (formato tabela) */
+  const add = (name, value) => {
+    const inp = document.createElement("input");
+    inp.type = "hidden"; inp.name = name; inp.value = value;
+    form.appendChild(inp);
+  };
+  add("_subject", "[PROVA] " + turma + " - " + nome + " - Nota " + nota);
+  add("_template", "table");
+  add("_captcha", "false");
+  add("_next", location.origin !== "null"
+        ? location.href.split("?")[0] + "?enviado=1"
+        : "https://formsubmit.co/thanks");
+  add("Prova", TITULO_PROVA);
+  add("Nota (0 a 10)", nota + "  (" + acertos + " de " + QUESTOES.length + " acertos)");
+  add("Data e hora", new Date().toLocaleString("pt-BR"));
+
+  respostas.forEach(r => {
+    add("Q" + String(r.questao).padStart(2, "0"),
+        "Marcou " + r.letraOriginal + " | Gabarito " + r.letraGabarito +
+        " | " + (r.acertou ? "CERTA" : "errada"));
+  });
+
+  /* Linha pronta para o Excel: Nome;Turma;Nota;Q1;Q2;...;DataHora */
+  const linhaExcel = [nome, turma, nota]
+    .concat(respostas.map(r => r.letraOriginal + (r.acertou ? " (C)" : " (E)")))
+    .concat([new Date().toLocaleString("pt-BR")])
+    .join(";");
+  add("RESUMO_EXCEL", linhaExcel);
+
+  /* Envia (POST real: a página navega para a confirmação) */
+  form.action = "https://formsubmit.co/" + EMAIL_PROFESSOR;
+  const btn = document.getElementById("btnEnviar");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+  form.submit();
+});
+</script>
+</body>
+</html>
