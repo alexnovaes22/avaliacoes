@@ -206,7 +206,7 @@
 /* ============================================================
    CONFIGURAÇÃO — edite apenas esta seção
    ============================================================ */
-const FORMSPREE_ID = "SEU_CODIGO_AQUI"; // cole aqui o código do seu formulário Formspree (ex.: "abcdwxyz")
+const FORMSPREE_ID = "xwvdwpqo"; // formulário Formspree de alex.novaes@escola.pr.gov.br
 const TITULO_PROVA = "Avaliação — Redes Sociais e Imagem Profissional";
 const DISCIPLINA   = "Gestão e Negócios — Prof. Me. Alex Ferreira Novaes";
 
@@ -466,7 +466,7 @@ $("btnEnviar").addEventListener("click", async () => {
   btn.textContent = "Enviando...";
 
   try {
-    const resp = await fetch("https://formspree.io/f/xwvdwpqo" + alex.novaes@escola.pr.gov.br, {
+    const resp = await fetch("https://formspree.io/f/" + FORMSPREE_ID, {
       method: "POST",
       headers: { "Accept": "application/json" },
       body: dados
