@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avaliações — Informática</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f0ede8;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    background: #fff;
+    max-width: 520px;
+    width: 100%;
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    overflow: hidden;
+  }
+
+  .topo {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 28px 32px 24px;
+    text-align: center;
+  }
+  .topo-escola {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+  .topo-titulo {
+    font-family: 'Source Serif 4', serif;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .topo-sub {
+    font-size: 11px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .corpo {
+    padding: 32px 32px 28px;
+  }
+
+  .instrucao {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 20px;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .instrucao strong {
+    display: block;
+    font-size: 16px;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+    font-family: 'Source Serif 4', serif;
+  }
+
+  .turmas {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .turma-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border: 1.5px solid #e0dcd6;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    color: #1a1a1a;
+    transition: all 0.15s;
+    background: #fff;
+  }
+  .turma-btn:hover {
+    border-color: #1a1a1a;
+    background: #f5f3ef;
+    transform: translateX(4px);
+  }
+  .turma-icone {
+    width: 38px;
+    height: 38px;
+    background: #1a1a1a;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .turma-info {
+    flex: 1;
+  }
+  .turma-nome {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 2px;
+  }
+  .turma-disc {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .turma-seta {
+    font-size: 16px;
+    color: #bbb;
+    transition: color 0.15s;
+  }
+  .turma-btn:hover .turma-seta { color: #1a1a1a; }
+
+  .rodape {
+    border-top: 1px solid #ece8e2;
+    padding: 12px 32px;
+    font-size: 10px;
+    color: #bbb;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="topo">
+    <div class="topo-escola">CEEP Castaldi — Londrina/PR</div>
+    <div class="topo-titulo">I Avaliação do II Trimestre</div>
+    <div class="topo-sub">Informática — HTML e GitHub</div>
+  </div>
+
+  <div class="corpo">
+    <div class="instrucao">
+      <strong>Escolha sua turma:</strong>
+      Clique na turma para iniciar sua avaliação.
+    </div>
+
+    <div class="turmas">
+
+      <a class="turma-btn" href="prova_html_github.html">
+        <div class="turma-icone">🎓</div>
+        <div class="turma-info">
+          <div class="turma-nome">1 ADM A</div>
+          <div class="turma-disc">Educação Digital</div>
+        </div>
+        <div class="turma-seta">→</div>
+      </a>
+
+      <a class="turma-btn" href="prova_html_github.html">
+        <div class="turma-icone">🎓</div>
+        <div class="turma-info">
+          <div class="turma-nome">1 ADM B</div>
+          <div class="turma-disc">Educação Digital</div>
+        </div>
+        <div class="turma-seta">→</div>
+      </a>
+
+      <a class="turma-btn" href="prova_html_github.html">
+        <div class="turma-icone">🎓</div>
+        <div class="turma-info">
+          <div class="turma-nome">1 ELETEL</div>
+          <div class="turma-disc">Educação Digital</div>
+        </div>
+        <div class="turma-seta">→</div>
+      </a>
+
+      <a class="turma-btn" href="prova_html_github.html">
+        <div class="turma-icone">🎓</div>
+        <div class="turma-info">
+          <div class="turma-nome">1 BIOTEC</div>
+          <div class="turma-disc">Educação Digital</div>
+        </div>
+        <div class="turma-seta">→</div>
+      </a>
+
+      <a class="turma-btn" href="prova_html_github.html">
+        <div class="turma-icone">🎓</div>
+        <div class="turma-info">
+          <div class="turma-nome">1 MARKETING</div>
+          <div class="turma-disc">Educação Digital</div>
+        </div>
+        <div class="turma-seta">→</div>
+      </a>
+
+    </div>
+  </div>
+
+  <div class="rodape">Prof. Me. Alex Ferreira Novaes — Informática</div>
+</div>
+
+</body>
+</html>

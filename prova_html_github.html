@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>I Avaliação do II Trimestre — HTML e GitHub</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f0ede8;
+    color: #1a1a1a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    background: #fff;
+    max-width: 680px;
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    overflow: hidden;
+  }
+
+  .topo {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 20px 32px 0;
+  }
+  .topo-titulo {
+    font-family: 'Source Serif 4', serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .topo-sub {
+    font-size: 11px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1.1px;
+    margin-top: 3px;
+    margin-bottom: 14px;
+  }
+  .progresso-wrap { background: #1a1a1a; padding: 0 32px 16px; }
+  .progresso-info { display: flex; justify-content: space-between; font-size: 10.5px; color: #888; margin-bottom: 6px; }
+  .progresso-barra-bg { background: #333; border-radius: 99px; height: 4px; }
+  .progresso-barra { background: #fff; border-radius: 99px; height: 4px; transition: width 0.4s ease; }
+
+  .corpo { padding: 32px 32px 24px; }
+
+  .tela { display: none; }
+  .tela.ativa { display: block; }
+
+  .tela-titulo { font-family: 'Source Serif 4', serif; font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .tela-sub { font-size: 12px; color: #888; margin-bottom: 24px; line-height: 1.5; }
+
+  .campo-grupo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .campo { display: flex; flex-direction: column; gap: 5px; }
+  .campo label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #888; }
+  .campo input {
+    border: 1.5px solid #ddd; border-radius: 5px; padding: 9px 12px;
+    font-size: 13px; font-family: 'Inter', sans-serif; background: #fafafa;
+    outline: none; color: #1a1a1a; transition: border-color 0.15s;
+  }
+  .campo input:focus { border-color: #1a1a1a; background: #fff; }
+  .campo input.erro { border-color: #e53e3e; }
+  .msg-erro { font-size: 11px; color: #e53e3e; margin-top: 2px; display: none; }
+  .msg-erro.visivel { display: block; }
+
+  .questao-tema { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #bbb; margin-bottom: 10px; }
+  .questao-enunciado { font-family: 'Source Serif 4', serif; font-size: 15px; font-weight: 600; line-height: 1.65; color: #1a1a1a; margin-bottom: 22px; }
+  .alternativas { display: flex; flex-direction: column; gap: 8px; }
+  .alternativa {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 11px 14px; border: 1.5px solid #e8e4df; border-radius: 6px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none;
+  }
+  .alternativa:hover { border-color: #bbb; background: #faf8f5; }
+  .alternativa.selecionada { border-color: #1a1a1a; background: #f5f3ef; }
+  .alt-circulo {
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #ccc;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 700; color: #999; flex-shrink: 0; margin-top: 1px; transition: all 0.15s;
+  }
+  .alternativa.selecionada .alt-circulo { background: #1a1a1a; border-color: #1a1a1a; color: #fff; }
+  .alt-texto { font-size: 13px; line-height: 1.55; color: #2a2a2a; }
+  .aviso-selecao { font-size: 11.5px; color: #e53e3e; margin-top: 10px; display: none; }
+  .aviso-selecao.visivel { display: block; }
+
+  .confirmacao-icon { font-size: 40px; text-align: center; margin-bottom: 16px; }
+  .confirmacao-titulo { font-family: 'Source Serif 4', serif; font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+  .confirmacao-sub { font-size: 13px; color: #666; text-align: center; line-height: 1.6; margin-bottom: 24px; }
+  .resumo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 24px; }
+  .resumo-item { border: 1.5px solid #e8e4df; border-radius: 5px; padding: 7px 4px; text-align: center; font-size: 11px; cursor: pointer; }
+  .resumo-item .num { font-weight: 700; font-size: 13px; display: block; }
+  .resumo-item.respondida { border-color: #1a1a1a; }
+  .resumo-item.nao-respondida { border-color: #e53e3e; color: #e53e3e; }
+  .aviso-nao-respondidas { font-size: 12px; color: #e53e3e; text-align: center; margin-bottom: 16px; display: none; }
+  .aviso-nao-respondidas.visivel { display: block; }
+
+  .pdf-icon { font-size: 40px; text-align: center; margin-bottom: 16px; }
+  .pdf-titulo { font-family: 'Source Serif 4', serif; font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+  .pdf-sub { font-size: 13px; color: #666; text-align: center; line-height: 1.6; margin-bottom: 28px; }
+  .instrucoes-pdf { background: #f5f3ef; border-radius: 6px; padding: 14px 16px; font-size: 12px; color: #555; line-height: 1.7; margin-bottom: 24px; }
+  .instrucoes-pdf b { color: #1a1a1a; }
+
+  .botoes { display: flex; gap: 10px; justify-content: flex-end; margin-top: 28px; }
+  .botoes.centralizado { justify-content: center; flex-direction: column; align-items: center; }
+  .btn { padding: 10px 22px; border-radius: 5px; font-size: 13px; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primario { background: #1a1a1a; color: #fff; }
+  .btn-primario:hover { background: #333; }
+  .btn-secundario { background: #f0ede8; color: #444; }
+  .btn-secundario:hover { background: #e5e1db; }
+  .btn-perigo { background: #1a1a1a; color: #fff; padding: 12px 32px; font-size: 14px; }
+  .btn-perigo:hover { background: #333; }
+  .btn-voltar-link { font-size: 12px; color: #999; text-decoration: underline; cursor: pointer; background: none; border: none; font-family: 'Inter', sans-serif; margin-top: 8px; }
+  .btn-voltar-link:hover { color: #555; }
+  .btn-pdf { background: #1a6b3c; color: #fff; padding: 13px 36px; font-size: 14px; border-radius: 6px; border: none; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; }
+  .btn-pdf:hover { background: #145530; }
+
+  .rodape-card { border-top: 1px solid #ece8e2; padding: 10px 32px; font-size: 10px; color: #bbb; text-align: center; }
+
+  /* ═══ IMPRESSÃO ═══ */
+
+  /* TRECHO */
+  .questao-enunciado { font-style: italic; background: #f0f4ff; border-left: 4px solid #4a6fa5; padding: 12px 15px; border-radius: 0 6px 6px 0; font-size: 14px; line-height: 1.7; margin-bottom: 8px; }
+  .questao-pergunta { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 16px; }
+
+  /* FOLHA IMPRESSÃO */
+  #folha-impressao { display: none; }
+  .fi-cabecalho { border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
+  .fi-titulo { font-size: 15px; font-weight: 700; }
+  .fi-sub { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
+  .fi-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 20px; margin-bottom: 8px; font-size: 11px; }
+  .fi-campo { font-size: 11px; }
+  .fi-linha { border-top: 1px solid #ccc; margin: 8px 0 12px; }
+  .fi-questao { margin-bottom: 13px; page-break-inside: avoid; }
+  .fi-tema { font-size: 8.5px; color: #aaa; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 3px; }
+  .fi-trecho { font-size: 11px; font-style: italic; color: #333; background: #f5f5f5; border-left: 3px solid #aaa; padding: 5px 8px; margin-bottom: 5px; line-height: 1.45; }
+  .fi-alt { font-size: 11px; margin-left: 6px; margin-bottom: 2px; line-height: 1.35; }
+  .fi-marcada { font-weight: 700; color: #1a2744; }
+  .fi-hr { border: none; border-top: 1px solid #eee; margin: 3px 0 10px; }
+  .fi-rodape { border-top: 2px solid #000; padding-top: 7px; margin-top: 12px; display: flex; justify-content: space-between; font-size: 10px; color: #444; }
+
+  @media print {
+    body { background: #fff; padding: 0; display: block; }
+    .card { box-shadow: none; border-radius: 0; max-width: 100%; }
+    .topo { background: #fff !important; border-bottom: 2px solid #000; padding: 12px 28px 10px; }
+    .topo-titulo { color: #000 !important; font-size: 16px; }
+    .topo-sub { color: #555 !important; }
+    .progresso-wrap { display: none; }
+    .corpo { padding: 16px 28px; }
+    .tela { display: none !important; }
+    .tela-pdf { display: block !important; }
+    .pdf-icon, .pdf-titulo, .pdf-sub, .instrucoes-pdf, .btn-pdf, .rodape-card, .btn { display: none !important; }
+    #folha-impressao { display: block !important; }
+  }
+
+  #folha-impressao { display: none; }
+  .fi-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 10px; }
+  .fi-campo { font-size: 11px; }
+  .fi-linha { border-top: 1px solid #ccc; margin: 10px 0 14px; }
+  .fi-instrucao { font-size: 10px; color: #666; font-style: italic; margin-bottom: 18px; }
+  .fi-questao { margin-bottom: 14px; page-break-inside: avoid; }
+  .fi-tema { font-size: 8.5px; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+  .fi-enunciado { font-size: 11.5px; font-weight: 700; line-height: 1.5; margin-bottom: 6px; font-family: 'Source Serif 4', serif; }
+  .fi-alt { font-size: 11px; margin-left: 8px; margin-bottom: 3px; line-height: 1.4; }
+  .fi-hr { border: none; border-top: 1px solid #e0e0e0; margin: 4px 0 12px; }
+  .fi-rodape { border-top: 1.5px solid #000; padding-top: 8px; margin-top: 16px; display: flex; justify-content: space-between; font-size: 10px; color: #555; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="topo">
+    <div class="topo-titulo">I Avaliação do II Trimestre</div>
+    <div class="topo-sub">Informática &mdash; HTML e GitHub</div>
+  </div>
+  <div class="progresso-wrap">
+    <div class="progresso-info">
+      <span id="txt-progresso">Identificação</span>
+      <span id="txt-etapa"></span>
+    </div>
+    <div class="progresso-barra-bg">
+      <div class="progresso-barra" id="barra-progresso" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="corpo">
+
+    <!-- TELA 0: IDENTIFICAÇÃO -->
+    <div class="tela ativa" id="tela-id">
+      <div class="tela-titulo">Identificação</div>
+      <div class="tela-sub">Preencha seus dados antes de iniciar a avaliação.</div>
+      <div class="campo-grupo">
+        <div class="campo">
+          <label>Nome *</label>
+          <input type="text" id="inp-nome" placeholder="Seu nome">
+          <span class="msg-erro" id="erro-nome">Informe seu nome.</span>
+        </div>
+        <div class="campo">
+          <label>Sobrenome *</label>
+          <input type="text" id="inp-sobrenome" placeholder="Seu sobrenome">
+          <span class="msg-erro" id="erro-sobrenome">Informe seu sobrenome.</span>
+        </div>
+      </div>
+      <div class="campo-grupo">
+        <div class="campo">
+          <label>Turma *</label>
+          <input type="text" id="inp-turma" placeholder="Ex: 2º A">
+          <span class="msg-erro" id="erro-turma">Informe sua turma.</span>
+        </div>
+        <div class="campo">
+          <label>Data</label>
+          <input type="text" id="inp-data" placeholder="dd/mm/aaaa">
+        </div>
+      </div>
+      <div class="botoes">
+        <button class="btn btn-primario" onclick="iniciarProva()">Iniciar avaliação →</button>
+      </div>
+    </div>
+
+    <!-- TELA QUESTÃO -->
+    <div class="tela" id="tela-questao">
+      <div class="questao-tema" id="q-tema"></div>
+      <div class="questao-enunciado" id="q-enunciado"></div>
+      <div class="questao-pergunta">Este trecho está relacionado a qual tema?</div>
+      <div class="alternativas" id="q-alternativas"></div>
+      <div class="aviso-selecao" id="aviso-selecao">⚠ Selecione uma alternativa para continuar.</div>
+      <div class="botoes">
+        <button class="btn btn-secundario" id="btn-anterior" onclick="anterior()">← Anterior</button>
+        <button class="btn btn-primario" id="btn-proximo" onclick="proximo()">Próxima →</button>
+      </div>
+    </div>
+
+    <!-- TELA CONFIRMAÇÃO -->
+    <div class="tela" id="tela-confirmacao">
+      <div class="confirmacao-icon">📋</div>
+      <div class="confirmacao-titulo">Deseja finalizar a avaliação?</div>
+      <div class="confirmacao-sub">Confira se todas as questões estão respondidas.<br>Clique em qualquer número para revisar uma questão.</div>
+      <div class="resumo-grid" id="resumo-grid"></div>
+      <div class="aviso-nao-respondidas" id="aviso-nao-respondidas">⚠ Você deixou questões sem resposta. Tem certeza que deseja finalizar?</div>
+      <div class="botoes centralizado">
+        <button class="btn btn-perigo" onclick="finalizar()">✓ Sim, finalizar avaliação</button>
+        <button class="btn-voltar-link" onclick="voltarParaQuestao()">← Voltar e revisar</button>
+      </div>
+    </div>
+
+    <!-- TELA PDF -->
+    <div class="tela tela-pdf" id="tela-pdf">
+      <div class="pdf-icon">✅</div>
+      <div class="pdf-titulo">Avaliação concluída!</div>
+      <div class="pdf-sub">Clique no botão abaixo para salvar sua avaliação em PDF<br>e envie o arquivo no Google Classroom.</div>
+      <div class="instrucoes-pdf">
+        <b>Como salvar em PDF:</b><br>
+        1. Clique em <b>"Salvar como PDF"</b><br>
+        2. Na janela que abrir, em <b>Destino</b> selecione <b>"Salvar como PDF"</b><br>
+        3. Clique em <b>Salvar</b> e escolha onde guardar o arquivo<br>
+        4. Acesse o <b>Google Classroom</b> e anexe o PDF na atividade correspondente
+      </div>
+      <div class="botoes centralizado">
+        <button class="btn-pdf" onclick="salvarPDF()">⬇ Salvar como PDF</button>
+      </div>
+      <div id="folha-impressao"></div>
+    </div>
+
+  </div>
+
+  <div class="rodape-card">Prof. Me. Alex Ferreira Novaes &mdash; Informática</div>
+</div>
+
+<script>
+const TEMAS = ["HTML","GitHub","Criar Repositório","Licença MIT","Repositório Público ou Privado","Botão Commit Changes","VS Code Dev","Tuner Aberto","Abrir Repositório Remoto","Arquivo index.html","Comandos Básicos de HTML","Tags HTML"];
+
+const BANCO = [
+  // HTML
+  {t:"HTML", x:"Maria abriu um arquivo no bloco de notas, digitou alguns códigos entre sinais de menor e maior, salvou com uma extensão específica e, ao abrir no navegador, viu um texto formatado com título e parágrafo aparecendo na tela."},
+  {t:"HTML", x:"O professor explicou que toda página que acessamos na internet é construída com uma linguagem de marcação que existe desde os anos 1990 e que qualquer navegador consegue interpretar e exibir."},
+  {t:"HTML", x:"João percebeu que, ao clicar com o botão direito em qualquer site e escolher 'Inspecionar' ou 'Ver código-fonte', conseguia ver toda a estrutura do documento com elementos organizados em hierarquia."},
+  {t:"HTML", x:"A sigla representa HyperText Markup Language — ou seja, uma linguagem de marcação de hipertexto, usada para estruturar o conteúdo de páginas web como textos, imagens, links e tabelas."},
+  {t:"HTML", x:"Diferente de linguagens de programação como Python ou JavaScript, essa linguagem não executa lógica — ela apenas descreve a estrutura e o conteúdo do que deve aparecer na tela do navegador."},
+
+  // GITHUB
+  {t:"GitHub", x:"Lucas usou uma plataforma online para guardar o código do seu projeto, compartilhar com colegas e acompanhar todas as alterações feitas ao longo do tempo, podendo voltar a versões anteriores se necessário."},
+  {t:"GitHub", x:"A professora pediu que os alunos criassem uma conta em um site que funciona como uma 'rede social de programadores', onde é possível publicar projetos, colaborar com outros desenvolvedores e mostrar o portfólio."},
+  {t:"GitHub", x:"Ana encontrou um projeto interessante, clicou em 'Fork' para copiar para sua própria conta e depois fez melhorias no código, podendo inclusive sugerir as mudanças de volta ao autor original."},
+  {t:"GitHub", x:"O desenvolvedor usava essa plataforma para registrar cada alteração feita no projeto com uma mensagem descritiva, criando um histórico completo de tudo que foi modificado, por quem e quando."},
+  {t:"GitHub", x:"Quando a empresa precisou que três programadores trabalhassem no mesmo projeto sem sobrescrever o trabalho um do outro, eles usaram essa plataforma para sincronizar as alterações de forma organizada."},
+
+  // CRIAR REPOSITÓRIO
+  {t:"Criar Repositório", x:"Depois de fazer login na plataforma, Pedro clicou no botão '+' no canto superior direito, escolheu uma opção no menu e preencheu um formulário com nome, descrição e algumas configurações iniciais do projeto."},
+  {t:"Criar Repositório", x:"A professora orientou que o primeiro passo antes de começar qualquer projeto é criar um espaço dedicado na plataforma para guardar todos os arquivos — esse espaço recebe um nome específico e fica associado à conta do usuário."},
+  {t:"Criar Repositório", x:"Carla precisava organizar os arquivos do site da escola em um único lugar online. Ela acessou sua conta, deu um nome ao projeto, escreveu uma breve descrição e clicou no botão verde para confirmar a criação."},
+  {t:"Criar Repositório", x:"O instrutor mostrou que cada projeto deve ter seu próprio espaço isolado na plataforma, com nome único, para que arquivos de projetos diferentes não se misturem e o histórico de alterações fique separado."},
+  {t:"Criar Repositório", x:"Ao criar o espaço para o projeto, Bruno marcou a opção para adicionar automaticamente um arquivo README, que serve para descrever o projeto para quem visitar a página."},
+
+  // LICENÇA MIT
+  {t:"Licença MIT", x:"Ao criar o repositório, Sofia marcou uma opção de licença que permite que qualquer pessoa use, copie, modifique e distribua o código livremente, inclusive em projetos comerciais, desde que mantenha o aviso de direitos autorais."},
+  {t:"Licença MIT", x:"O professor explicou que essa licença é uma das mais simples e permissivas disponíveis — ela basicamente diz: 'pode usar à vontade, só não pode me responsabilizar se algo der errado'."},
+  {t:"Licença MIT", x:"Diego escolheu essa licença para o seu projeto porque queria que outros desenvolvedores pudessem usar o código sem burocracia, mantendo apenas a obrigação de citar o autor original."},
+  {t:"Licença MIT", x:"Essa licença leva o nome de uma famosa universidade americana e é amplamente usada em projetos de código aberto por ser curta, clara e muito permissiva quanto ao uso e redistribuição do código."},
+  {t:"Licença MIT", x:"Ao abrir o repositório do colega, Fernanda viu um arquivo chamado LICENSE.txt. Ao clicar, leu um texto curto informando que o código podia ser usado, modificado e distribuído livremente."},
+
+  // REPOSITÓRIO PÚBLICO OU PRIVADO
+  {t:"Repositório Público ou Privado", x:"Ao criar o projeto, Rafael precisou decidir se qualquer pessoa na internet poderia ver e baixar os arquivos, ou se o acesso ficaria restrito apenas às pessoas que ele autorizar explicitamente."},
+  {t:"Repositório Público ou Privado", x:"A professora explicou que projetos de portfólio, exercícios escolares e projetos open source devem usar uma configuração, enquanto projetos com dados sensíveis ou código comercial devem usar outra."},
+  {t:"Repositório Público ou Privado", x:"Bianca estava desenvolvendo o site de um cliente e não queria que o código ficasse disponível para qualquer um na internet, então escolheu a opção que restringe o acesso apenas a ela e aos colaboradores convidados."},
+  {t:"Repositório Público ou Privado", x:"No formulário de criação do projeto, havia duas opções com ícones de cadeado e globo, indicando que o estudante deveria escolher entre deixar o projeto visível para todos ou apenas para quem for autorizado."},
+  {t:"Repositório Público ou Privado", x:"O instrutor recomendou que os alunos deixassem os projetos da disciplina visíveis para qualquer pessoa, pois isso facilita a correção pelo professor e também serve como portfólio para o futuro."},
+
+  // BOTÃO COMMIT CHANGES
+  {t:"Botão Commit Changes", x:"Após editar o arquivo diretamente na plataforma online, Thiago rolou a página até o final, escreveu uma mensagem curta descrevendo o que tinha mudado e clicou em um botão verde para salvar oficialmente a alteração no histórico do projeto."},
+  {t:"Botão Commit Changes", x:"A professora explicou que simplesmente salvar um arquivo não é suficiente — é preciso registrar a alteração com uma mensagem descritiva, como se fosse assinar e datar cada modificação feita no projeto."},
+  {t:"Botão Commit Changes", x:"Camila percebeu que toda vez que terminava de editar um arquivo online, precisava realizar uma ação final que registrava a mudança com data, hora e uma descrição do que foi feito — criando assim um histórico rastreável."},
+  {t:"Botão Commit Changes", x:"O instrutor mostrou que é uma boa prática escrever mensagens claras ao confirmar cada alteração, como 'Adiciona título na página inicial' ou 'Corrige erro no rodapé', para que qualquer pessoa entenda o que mudou."},
+  {t:"Botão Commit Changes", x:"Ao clicar nesse botão, Pedro estava dizendo para a plataforma: 'Quero que essa versão do arquivo fique registrada no histórico do projeto com a mensagem que escrevi'."},
+
+  // VS CODE DEV
+  {t:"VS Code Dev", x:"Sem instalar nada no computador, Letícia acessou seu repositório, pressionou a tecla ponto '.' no teclado e um editor de código profissional abriu diretamente no navegador, com todos os arquivos do projeto à esquerda."},
+  {t:"VS Code Dev", x:"O professor mostrou que existe uma forma de editar arquivos de código diretamente pelo navegador, com destaque colorido de sintaxe e organização por pastas, sem precisar baixar nenhum programa."},
+  {t:"VS Code Dev", x:"Marcos estava usando o computador da escola, que não tinha editor de código instalado. Ele acessou o repositório online e usou um atalho de teclado para abrir um ambiente de edição completo no próprio navegador."},
+  {t:"VS Code Dev", x:"Essa ferramenta é basicamente a versão web de um editor de código muito popular entre programadores, acessível diretamente pelo navegador ao navegar em qualquer repositório na plataforma."},
+  {t:"VS Code Dev", x:"Paula precisava fazer uma correção rápida em um arquivo enquanto estava em outro computador. Ela abriu o repositório, pressionou '.' e conseguiu editar o código como se estivesse no editor instalado na sua máquina."},
+
+  // TUNER ABERTO
+  {t:"Tuner Aberto", x:"A professora mostrou como abrir uma aba especial dentro do editor onde é possível visualizar em tempo real como o arquivo HTML está sendo renderizado, sem precisar abrir o arquivo em outro programa."},
+  {t:"Tuner Aberto", x:"Enquanto editava o código, Ricardo abriu um painel lateral que mostrava a prévia da página atualizada a cada mudança, permitindo ver imediatamente o resultado visual de cada tag que ele digitava."},
+  {t:"Tuner Aberto", x:"No ambiente de edição online, existe a possibilidade de dividir a tela: de um lado o código, do outro a visualização do resultado — facilitando o desenvolvimento sem precisar alternar entre janelas."},
+  {t:"Tuner Aberto", x:"A estudante usou um recurso do editor que atualiza automaticamente a visualização do arquivo toda vez que ela salva uma alteração, agilizando o processo de verificar se o código está correto."},
+  {t:"Tuner Aberto", x:"Ao invés de salvar, abrir o gerenciador de arquivos e clicar duas vezes no HTML para ver o resultado, Aline aprendeu a usar um painel dentro do próprio editor que mostra a página renderizada em tempo real."},
+
+  // ABRIR REPOSITÓRIO REMOTO
+  {t:"Abrir Repositório Remoto", x:"O professor mostrou como conectar o editor de código instalado no computador a um projeto que está hospedado online, de forma que as alterações feitas localmente possam ser enviadas diretamente para a plataforma."},
+  {t:"Abrir Repositório Remoto", x:"Sem precisar baixar os arquivos manualmente, Gustavo usou uma opção no editor para acessar diretamente o projeto que estava guardado na plataforma online, editando os arquivos como se estivessem no computador."},
+  {t:"Abrir Repositório Remoto", x:"A turma aprendeu que é possível trabalhar em um projeto hospedado na internet sem fazer download — basta usar a função do editor que estabelece uma conexão direta com o repositório da plataforma."},
+  {t:"Abrir Repositório Remoto", x:"Renata copiou o endereço do repositório online, abriu o editor no computador, usou uma opção específica no menu e o projeto inteiro apareceu na barra lateral, pronto para edição."},
+  {t:"Abrir Repositório Remoto", x:"O instrutor explicou que trabalhar diretamente conectado ao repositório online é mais prático do que baixar os arquivos, editar e reenviar manualmente — tudo fica sincronizado automaticamente."},
+
+  // ARQUIVO INDEX.HTML
+  {t:"Arquivo index.html", x:"A professora explicou que quando alguém digita apenas o endereço de um site, sem especificar nenhum arquivo, o servidor procura automaticamente por um arquivo com esse nome específico para exibir como página inicial."},
+  {t:"Arquivo index.html", x:"Bruno criou vários arquivos HTML no repositório, mas sabia que apenas um deles seria carregado automaticamente pelo GitHub Pages como página principal do site, sem precisar digitar seu nome na URL."},
+  {t:"Arquivo index.html", x:"Ao ativar o GitHub Pages, Isabela percebeu que o site só funcionou corretamente depois que ela renomeou o arquivo principal da pasta raiz com o nome padrão que os servidores web reconhecem como página inicial."},
+  {t:"Arquivo index.html", x:"Quando o visitante acessa 'usuario.github.io/projeto', o servidor entrega automaticamente esse arquivo específico — por isso todo projeto web deve ter um arquivo com esse nome na pasta principal."},
+  {t:"Arquivo index.html", x:"O aluno criou o repositório, ativou o GitHub Pages e tentou acessar o site, mas a página não abriu. O professor identificou o problema: faltava criar o arquivo com o nome correto na raiz do projeto."},
+
+  // COMANDOS BÁSICOS DE HTML
+  {t:"Comandos Básicos de HTML", x:"A professora mostrou que antes de qualquer conteúdo, todo documento web deve começar com uma declaração que informa ao navegador qual versão da linguagem está sendo usada naquele arquivo."},
+  {t:"Comandos Básicos de HTML", x:"Ao estruturar o documento, o aluno aprendeu que existe uma divisão em duas partes: uma que contém informações invisíveis ao usuário, como título da aba e configurações, e outra que contém tudo que aparece na tela."},
+  {t:"Comandos Básicos de HTML", x:"Felipe digitou um código que define o idioma do documento, o tipo de caracteres usados e o título que aparece na aba do navegador — configurações essenciais que ficam no topo de todo arquivo web."},
+  {t:"Comandos Básicos de HTML", x:"A estrutura básica que qualquer arquivo web precisa ter inclui: a declaração do tipo de documento, o elemento raiz, a seção de cabeçalho com metadados e a seção principal onde o conteúdo visível é inserido."},
+  {t:"Comandos Básicos de HTML", x:"O professor mostrou a estrutura mínima de um arquivo: quatro elementos obrigatórios aninhados um dentro do outro, formando o esqueleto de qualquer página web, independente do conteúdo que será inserido depois."},
+
+  // TAGS HTML
+  {t:"Tags HTML", x:"O professor explicou que os elementos dessa linguagem são representados por palavras-chave entre sinais de menor e maior, e que a maioria deles precisa de uma versão de abertura e uma de fechamento para funcionar corretamente."},
+  {t:"Tags HTML", x:"Luiza aprendeu que para deixar um texto em negrito ela deveria envolver as palavras com um par de marcações, sendo que a segunda é igual à primeira, mas com uma barra antes do nome — indicando o fim do elemento."},
+  {t:"Tags HTML", x:"Ao inspecionar uma página no navegador, Carlos viu que o conteúdo estava organizado em blocos aninhados: textos dentro de parágrafos, parágrafos dentro de seções, seções dentro do corpo — tudo marcado com esses delimitadores."},
+  {t:"Tags HTML", x:"A estudante precisava inserir uma imagem na página. Ela aprendeu que alguns elementos não precisam de fechamento — basta escrever a marcação de abertura com o atributo indicando o caminho do arquivo."},
+  {t:"Tags HTML", x:"O instrutor mostrou exemplos como h1, h2, p, a, img, ul, li — cada um com uma função específica para definir títulos, parágrafos, links, imagens e listas dentro de um documento web."},
+];
+
+const LETRAS = ["A","B","C","D"];
+let questoes = [], atual = 0, respostas = {}, dadosAluno = {};
+
+function embaralhar(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function mostrarTela(id) {
+  document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
+  document.getElementById(id).classList.add('ativa');
+}
+
+function atualizarProgresso(pct, label) {
+  document.getElementById('barra-progresso').style.width = pct + '%';
+  document.getElementById('txt-progresso').textContent = label;
+  document.getElementById('txt-etapa').textContent = pct + '%';
+}
+
+function iniciarProva() {
+  let ok = true;
+  [['inp-nome','erro-nome'],['inp-sobrenome','erro-sobrenome'],['inp-turma','erro-turma']].forEach(([f,e]) => {
+    const val = document.getElementById(f).value.trim();
+    if (!val) {
+      document.getElementById(f).classList.add('err');
+      document.getElementById(e).classList.add('visivel');
+      ok = false;
+    } else {
+      document.getElementById(f).classList.remove('err');
+      document.getElementById(e).classList.remove('visivel');
+    }
+  });
+  if (!ok) return;
+
+  dadosAluno = {
+    nome:     document.getElementById('inp-nome').value.trim(),
+    sobrenome:document.getElementById('inp-sobrenome').value.trim(),
+    turma:    document.getElementById('inp-turma').value.trim(),
+    data:     document.getElementById('inp-data').value.trim() || new Date().toLocaleDateString('pt-BR')
+  };
+
+  const sel = embaralhar(BANCO).slice(0, 10);
+  questoes = sel.map(q => {
+    const outros = TEMAS.filter(t => t !== q.t);
+    const ops = embaralhar([q.t, ...embaralhar(outros).slice(0,3)]);
+    return { txt: q.x, tema: q.t, ops };
+  });
+
+  atual = 0; respostas = {};
+  mostrarTela('tela-questao');
+  renderQuestao();
+}
+
+function renderQuestao() {
+  const q = questoes[atual];
+  document.getElementById('q-tema').textContent = q.tema;
+  document.getElementById('q-enunciado').textContent = '"' + q.txt + '"';
+  document.getElementById('aviso-selecao').classList.remove('visivel');
+
+  const cont = document.getElementById('q-alternativas');
+  cont.innerHTML = '';
+  q.ops.forEach((op, j) => {
+    const label = document.createElement('div');
+    label.className = 'alternativa' + (respostas[atual] === j ? ' selecionada' : '');
+    label.onclick = () => selecionar(j);
+    label.innerHTML = '<div class="alt-circulo">' + LETRAS[j] + '</div><span class="alt-texto">' + op + '</span>';
+    cont.appendChild(label);
+  });
+
+  document.getElementById('btn-anterior').style.display = atual === 0 ? 'none' : 'inline-block';
+  document.getElementById('btn-proximo').textContent = atual === questoes.length - 1 ? 'Finalizar →' : 'Próxima →';
+
+  const pct = Math.round(((atual + 1) / (questoes.length + 1)) * 90);
+  atualizarProgresso(pct, 'Questão ' + (atual + 1) + ' de ' + questoes.length);
+}
+
+function selecionar(j) {
+  respostas[atual] = j;
+  document.querySelectorAll('.alternativa').forEach((el, i) => el.classList.toggle('selecionada', i === j));
+  document.getElementById('aviso-selecao').classList.remove('visivel');
+}
+
+function proximo() {
+  if (respostas[atual] === undefined) { document.getElementById('aviso-selecao').classList.add('visivel'); return; }
+  if (atual < questoes.length - 1) { atual++; renderQuestao(); }
+  else mostrarConfirmacao();
+}
+
+function anterior() { if (atual > 0) { atual--; renderQuestao(); } }
+
+function mostrarConfirmacao() {
+  const grid = document.getElementById('resumo-grid'); grid.innerHTML = '';
+  let nao = 0;
+  questoes.forEach((_, i) => {
+    const resp = respostas[i] !== undefined;
+    const div = document.createElement('div');
+    div.className = 'resumo-item ' + (resp ? 'respondida' : 'nao-respondida');
+    div.innerHTML = '<span class="num">' + (i+1) + '</span>' + (resp ? '✓' : '✗');
+    div.onclick = () => { atual = i; mostrarTela('tela-questao'); renderQuestao(); };
+    grid.appendChild(div);
+    if (!resp) nao++;
+  });
+  document.getElementById('aviso-nao-respondidas').classList.toggle('visivel', nao > 0);
+  atualizarProgresso(95, 'Confirmar envio');
+  mostrarTela('tela-confirmacao');
+}
+
+function voltarParaQuestao() {
+  const i = questoes.findIndex((_, i) => respostas[i] === undefined);
+  atual = i >= 0 ? i : questoes.length - 1;
+  mostrarTela('tela-questao'); renderQuestao();
+}
+
+function finalizar() {
+  atualizarProgresso(100, 'Avaliação concluída');
+  gerarFolhaImpressao();
+  mostrarTela('tela-pdf');
+}
+
+function gerarFolhaImpressao() {
+  const fi = document.getElementById('folha-impressao');
+  let h = '<div class="fi-cabecalho"><div class="fi-titulo">I Avaliação do II Trimestre — Informática</div><div class="fi-sub">HTML e GitHub</div></div>';
+  h += '<div class="fi-campos">';
+  h += '<div class="fi-campo"><b>Nome:</b> ' + dadosAluno.nome + ' ' + dadosAluno.sobrenome + '</div>';
+  h += '<div class="fi-campo"><b>Turma:</b> ' + dadosAluno.turma + '</div>';
+  h += '<div class="fi-campo"><b>Data:</b> ' + dadosAluno.data + '</div>';
+  h += '<div class="fi-campo"><b>Nota:</b> _______ / 10,0</div>';
+  h += '</div><div class="fi-linha"></div>';
+
+  questoes.forEach((q, i) => {
+    const ri = respostas[i];
+    h += '<div class="fi-questao">';
+    h += '<div class="fi-tema">' + q.tema + '</div>';
+    h += '<div class="fi-trecho">&ldquo;' + q.txt + '&rdquo;</div>';
+    q.ops.forEach((op, j) => {
+      const marc = ri === j;
+      h += '<div class="fi-alt' + (marc ? ' fi-marcada' : '') + '">' + (marc ? '●' : '○') + ' ' + LETRAS[j] + ') ' + op + '</div>';
+    });
+    h += '</div>';
+    if (i < questoes.length - 1) h += '<hr class="fi-hr">';
+  });
+
+  h += '<div class="fi-rodape"><span>Prof. Me. Alex Ferreira Novaes — Informática</span><span>Nota: _______ / 10,0</span></div>';
+  fi.innerHTML = h;
+}
+
+function salvarPDF() { window.print(); }
+</script>
+</body>
+</html>
