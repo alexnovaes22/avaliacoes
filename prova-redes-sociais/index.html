@@ -466,7 +466,7 @@ $("btnEnviar").addEventListener("click", async () => {
   btn.textContent = "Enviando...";
 
   try {
-    const resp = await fetch("https://formspree.io/f/xwvdwpqo" + FORMSPREE_ID, {
+    const resp = await fetch("https://formspree.io/f/xwvdwpqo" + xwvdwpqo, {
       method: "POST",
       headers: { "Accept": "application/json" },
       body: dados
