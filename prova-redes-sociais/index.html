@@ -1,1 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prova Online — Redes Sociais e Imagem Profissional</title>
+<!--
+================================================================================
+ PROVA ONLINE COM ENVIO POR E-MAIL (Formspree)
+ Prof. Me. Alex Ferreira Novaes — alex.novaes@escola.pr.gov.br
+--------------------------------------------------------------------------------
+ COMO CONFIGURAR (uma única vez):
 
+ 1. Acesse https://formspree.io e crie uma conta gratuita usando o e-mail
+    alex.novaes@escola.pr.gov.br (confirme o e-mail de verificação).
+
+ 2. No painel, clique em "+ New form", dê um nome (ex.: "Prova Redes Sociais")
+    e o Formspree mostrará o endereço do formulário, no formato:
+        https://formspree.io/f/abcdwxyz
+
+ 3. Copie apenas o código final (ex.: "abcdwxyz") e cole na constante
+    FORMSPREE_ID logo abaixo, na seção CONFIGURAÇÃO.
+
+ 4. Faça um envio de teste você mesmo antes de liberar aos alunos.
+
+ OBSERVAÇÃO: o plano gratuito do Formspree aceita 50 envios por mês por conta.
+ Se tiver mais de 50 alunos no mês, crie a prova em contas separadas ou
+ considere o envio em turmas alternadas.
+
+ O e-mail chega com: nome, turma, nota corrigida, cada resposta vs. gabarito
+ e a linha RESUMO_EXCEL (valores separados por ";") para colar no Excel:
+ Dados > Texto para Colunas > Delimitado > ponto e vírgula.
+
+ PARA EDITAR A PROVA: altere apenas TITULO_PROVA, DISCIPLINA e o array QUESTOES.
+ Em cada questão, "correta" é o índice da alternativa certa (0 = A, 1 = B...).
+================================================================================
+-->
+<style>
+  :root{
+    --tinta:#1b2733;
+    --papel:#f6f7f9;
+    --cartao:#ffffff;
+    --marinho:#153e5c;
+    --marinho-escuro:#0e2c42;
+    --destaque:#0e7c66;
+    --erro:#b3372f;
+    --linha:#d8dee6;
+    --cinza:#5b6875;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:Georgia,'Times New Roman',serif;
+    background:var(--papel);color:var(--tinta);line-height:1.55;
+    padding:24px 12px 64px;
+  }
+  .folha{
+    max-width:760px;margin:0 auto;background:var(--cartao);
+    border:1px solid var(--linha);border-top:6px solid var(--marinho);
+    border-radius:6px;box-shadow:0 2px 10px rgba(20,40,60,.07);
+    padding:32px clamp(18px,5vw,48px) 40px;
+  }
+  .cabecalho{border-bottom:2px solid var(--marinho);padding-bottom:16px;margin-bottom:20px;}
+  .cabecalho .instituicao{
+    font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--cinza);margin-bottom:6px;
+  }
+  .cabecalho h1{font-size:clamp(19px,4vw,25px);color:var(--marinho-escuro);font-weight:700;}
+  .cabecalho .disciplina{font-style:italic;color:var(--cinza);margin-top:4px;font-size:15px;}
+  .instrucoes{
+    background:#eef3f7;border-left:4px solid var(--marinho);border-radius:0 4px 4px 0;
+    padding:12px 16px;font-size:14px;margin-bottom:22px;color:#2c3e50;
+  }
+  .instrucoes strong{color:var(--marinho-escuro);}
+  label.rotulo{
+    display:block;font-family:Arial,Helvetica,sans-serif;font-size:11px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--cinza);margin-bottom:5px;
+  }
+  input[type=text]{
+    width:100%;padding:11px 12px;font-size:16px;font-family:inherit;
+    border:1px solid var(--linha);border-radius:4px;background:#fcfdfe;color:var(--tinta);
+  }
+  input[type=text]:focus{outline:2px solid var(--marinho);outline-offset:1px;}
+  .campo{margin-bottom:16px;}
+
+  /* Barra de progresso */
+  .progresso{margin-bottom:20px;}
+  .progresso .texto{
+    font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--cinza);margin-bottom:6px;
+    display:flex;justify-content:space-between;
+  }
+  .progresso .trilha{height:7px;background:#e4e9ee;border-radius:99px;overflow:hidden;}
+  .progresso .barra{height:100%;width:0;background:var(--marinho);border-radius:99px;transition:width .3s ease;}
+
+  .questao .num{
+    font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:13px;
+    color:var(--marinho);letter-spacing:.06em;margin-bottom:8px;
+  }
+  .questao .enunciado{font-size:17px;margin-bottom:16px;}
+  .alt{
+    display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-radius:5px;
+    cursor:pointer;border:1px solid var(--linha);margin-bottom:9px;background:#fdfdfd;
+  }
+  .alt:hover{background:#eef3f7;}
+  .alt.selecionada{border-color:var(--marinho);background:#e9f0f6;}
+  .alt input{margin-top:4px;accent-color:var(--marinho);cursor:pointer;flex-shrink:0;}
+  .alt .letra{font-weight:700;color:var(--marinho);font-family:Arial,sans-serif;font-size:14px;margin-top:1px;}
+  .alt span.texto{font-size:15.5px;}
+
+  .navegacao{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    border-top:1px solid var(--linha);padding-top:20px;margin-top:22px;
+  }
+  .aviso{color:var(--erro);font-size:14px;font-style:italic;display:none;text-align:center;margin-top:12px;}
+  button{
+    font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;
+    letter-spacing:.05em;text-transform:uppercase;border-radius:5px;
+    padding:13px 26px;cursor:pointer;border:none;
+  }
+  .btn-principal{color:#fff;background:var(--marinho);}
+  .btn-principal:hover{background:var(--marinho-escuro);}
+  .btn-principal:disabled{background:#9aa7b2;cursor:wait;}
+  .btn-secundario{color:var(--marinho);background:#fff;border:1.5px solid var(--marinho);}
+  .btn-secundario:hover{background:#eef3f7;}
+  .btn-enviar{background:var(--destaque);}
+  .btn-enviar:hover{background:#0a614f;}
+
+  .confirmacao{text-align:center;padding:48px 20px;}
+  .confirmacao .selo{
+    width:74px;height:74px;border-radius:50%;background:var(--destaque);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 18px;
+  }
+  .confirmacao h2{color:var(--marinho-escuro);margin-bottom:10px;}
+  .confirmacao p{color:var(--cinza);}
+  .oculto{display:none!important;}
+</style>
+</head>
+<body>
+<div class="folha">
+
+  <!-- ================= TELA DE CONFIRMAÇÃO (pós-envio) ================= -->
+  <div id="telaConfirmacao" class="confirmacao oculto">
+    <div class="selo">✓</div>
+    <h2>Prova enviada com sucesso!</h2>
+    <p>Suas respostas foram registradas e encaminhadas ao professor.<br>
+    Você já pode fechar esta janela.</p>
+  </div>
+
+  <!-- ============================ PROVA ============================ -->
+  <div id="telaProva">
+    <header class="cabecalho">
+      <p class="instituicao">CEEP &middot; Avaliação Online</p>
+      <h1 id="tituloProva">Prova</h1>
+      <p class="disciplina" id="disciplinaProva"></p>
+    </header>
+
+    <!-- Etapa 0: identificação -->
+    <div id="etapaIdentificacao">
+      <div class="instrucoes">
+        <strong>Instruções:</strong> a prova possui <strong>10 questões</strong>, exibidas
+        <strong>uma por vez</strong>, cada uma com apenas <strong>uma alternativa correta</strong>.
+        Você pode voltar e revisar antes de enviar. A ordem das questões e das alternativas
+        é diferente para cada aluno. Só é possível enviar <strong>uma única vez</strong>.
+      </div>
+      <div class="campo">
+        <label class="rotulo" for="nomeAluno">Nome completo</label>
+        <input type="text" id="nomeAluno" autocomplete="off">
+      </div>
+      <div class="campo">
+        <label class="rotulo" for="turmaAluno">Turma</label>
+        <input type="text" id="turmaAluno" autocomplete="off">
+      </div>
+      <div class="navegacao" style="justify-content:flex-end;">
+        <button class="btn-principal" id="btnIniciar">Iniciar prova</button>
+      </div>
+      <p class="aviso" id="avisoIdent">Preencha o nome completo e a turma para iniciar.</p>
+    </div>
+
+    <!-- Etapa das questões (uma por vez) -->
+    <div id="etapaQuestoes" class="oculto">
+      <div class="progresso">
+        <div class="texto">
+          <span id="progTexto">Questão 1 de 10</span>
+          <span id="progRespondidas">0 respondidas</span>
+        </div>
+        <div class="trilha"><div class="barra" id="progBarra"></div></div>
+      </div>
+
+      <div class="questao">
+        <p class="num" id="qNum"></p>
+        <p class="enunciado" id="qEnunciado"></p>
+        <div id="qAlternativas"></div>
+      </div>
+
+      <div class="navegacao">
+        <button class="btn-secundario" id="btnAnterior">&larr; Anterior</button>
+        <button class="btn-principal" id="btnProxima">Próxima &rarr;</button>
+        <button class="btn-principal btn-enviar oculto" id="btnEnviar">Enviar prova</button>
+      </div>
+      <p class="aviso" id="avisoQuestao"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURAÇÃO — edite apenas esta seção
+   ============================================================ */
+const FORMSPREE_ID = "SEU_CODIGO_AQUI"; // cole aqui o código do seu formulário Formspree (ex.: "abcdwxyz")
+const TITULO_PROVA = "Avaliação — Redes Sociais e Imagem Profissional";
+const DISCIPLINA   = "Gestão e Negócios — Prof. Me. Alex Ferreira Novaes";
+
+/* "correta" = índice da alternativa certa ANTES do embaralhamento (0=A, 1=B, 2=C, 3=D) */
+const QUESTOES = [
+  { /* 1 — Comunicação e imagem profissional */
+    enunciado: "Ao enviar uma mensagem a um recrutador ou a um possível cliente por uma rede social, a postura mais adequada de comunicação profissional é:",
+    alternativas: [
+      "Usar linguagem clara e cordial, apresentar-se, ir direto ao assunto e revisar o texto antes de enviar.",
+      "Escrever com gírias e abreviações para parecer descontraído e próximo da pessoa.",
+      "Enviar a mesma mensagem genérica, sem personalização, para o maior número possível de contatos.",
+      "Cobrar resposta imediata em mensagens seguidas, demonstrando insistência e urgência."
+    ],
+    correta: 0
+  },
+  { /* 2 — Comunicação e imagem profissional */
+    enunciado: "Sobre a imagem profissional no ambiente digital, é correto afirmar que:",
+    alternativas: [
+      "Ela é formada apenas pelo currículo em PDF, pois publicações em redes sociais não influenciam a percepção de empregadores.",
+      "Ela é construída pelo conjunto do que a pessoa publica, comenta e compartilha, funcionando como uma vitrine permanente do seu comportamento.",
+      "Ela depende exclusivamente da quantidade de seguidores que a pessoa possui.",
+      "Ela só passa a existir depois que a pessoa é contratada por uma empresa."
+    ],
+    correta: 1
+  },
+  { /* 3 — Redes de uso pessoal x profissional */
+    enunciado: "Qual das alternativas apresenta corretamente a distinção entre redes de uso pessoal e redes de uso profissional?",
+    alternativas: [
+      "Redes pessoais servem para vender produtos; redes profissionais servem para postar fotos de lazer.",
+      "Não há distinção: todo conteúdo pode ser publicado da mesma forma em qualquer rede.",
+      "Redes pessoais priorizam o convívio social, lazer e vida particular; redes profissionais priorizam carreira, networking e conteúdos da área de atuação.",
+      "Redes profissionais são pagas, enquanto redes pessoais são sempre gratuitas."
+    ],
+    correta: 2
+  },
+  { /* 4 — Redes de uso pessoal x profissional */
+    enunciado: "Um estudante de Gestão e Negócios deseja divulgar suas conquistas acadêmicas, certificados e experiências de estágio para o mercado de trabalho. A rede social mais adequada para esse objetivo é:",
+    alternativas: [
+      "TikTok, pois os vídeos curtos alcançam mais visualizações.",
+      "WhatsApp, enviando os certificados nos grupos da família.",
+      "Um perfil fechado no Instagram, visível apenas para amigos próximos.",
+      "LinkedIn, por ser uma rede voltada a contatos profissionais, vagas e conteúdo de carreira."
+    ],
+    correta: 3
+  },
+  { /* 5 — Importância das redes sociais no contexto profissional */
+    enunciado: "Sobre a importância das redes sociais no contexto profissional atual, é correto afirmar que:",
+    alternativas: [
+      "Recrutadores são proibidos por lei de visualizar perfis públicos de candidatos.",
+      "Muitos recrutadores pesquisam os perfis públicos dos candidatos, e o conteúdo encontrado pode influenciar a decisão de contratação.",
+      "As redes sociais só têm utilidade profissional para influenciadores digitais.",
+      "Empresas não utilizam redes sociais, pois preferem apenas anúncios em jornais impressos."
+    ],
+    correta: 1
+  },
+  { /* 6 — Importância das redes sociais no contexto profissional */
+    enunciado: "No contexto profissional, o termo networking significa:",
+    alternativas: [
+      "A velocidade da conexão de internet utilizada no trabalho.",
+      "O ato de adicionar o máximo de desconhecidos possível para aumentar números do perfil.",
+      "A construção e manutenção de uma rede de contatos profissionais, baseada em relacionamentos e trocas que podem gerar oportunidades.",
+      "Um aplicativo específico usado somente por grandes empresas."
+    ],
+    correta: 2
+  },
+  { /* 7 — Imagem pessoal e reputação: o que seu perfil comunica */
+    enunciado: "Sobre imagem pessoal e reputação nas redes sociais, analise a situação: um candidato tem currículo excelente, mas seu perfil público exibe ofensas, brigas em comentários e publicações desrespeitosas. O efeito mais provável é:",
+    alternativas: [
+      "Nenhum, pois o recrutador avalia somente o currículo em papel.",
+      "Positivo, pois demonstra que o candidato tem personalidade forte.",
+      "O perfil será ignorado, já que publicações antigas desaparecem automaticamente.",
+      "Negativo, pois a reputação digital transmite valores e comportamento, podendo custar a oportunidade mesmo com bom currículo."
+    ],
+    correta: 3
+  },
+  { /* 8 — Imagem pessoal e reputação: o que seu perfil comunica */
+    enunciado: "Em relação ao que um perfil comunica, qual conjunto de elementos contribui para transmitir uma imagem profissional positiva?",
+    alternativas: [
+      "Foto adequada ao contexto, descrição clara sobre a área de atuação e publicações que demonstrem interesse e aprendizado profissional.",
+      "Foto de perfil com filtros exagerados e biografia contendo apenas frases de indireta.",
+      "Publicações frequentes reclamando de professores, colegas e chefes.",
+      "Perfil sem nenhuma informação, pois o mistério gera curiosidade nos recrutadores."
+    ],
+    correta: 0
+  },
+  { /* 9 — Ética e responsabilidade nas redes */
+    enunciado: "Um colaborador insatisfeito publica em seu perfil pessoal informações internas e críticas ofensivas à empresa em que trabalha. Do ponto de vista da ética e da responsabilidade nas redes, essa conduta:",
+    alternativas: [
+      "É aceitável, pois o perfil é pessoal e a empresa não pode se importar com isso.",
+      "É inadequada, pois expõe informações confidenciais e prejudica a imagem da empresa e a reputação do próprio profissional, podendo gerar demissão por justa causa.",
+      "É recomendada, pois demonstra transparência com os seguidores.",
+      "Só seria um problema se a publicação recebesse muitas curtidas."
+    ],
+    correta: 1
+  },
+  { /* 10 — LinkedIn */
+    enunciado: "Sobre o LinkedIn, é correto afirmar que:",
+    alternativas: [
+      "É uma rede voltada ao compartilhamento de momentos de lazer com amigos e familiares.",
+      "Serve apenas para empresas publicarem anúncios pagos, sem espaço para perfis individuais.",
+      "É uma rede social profissional em que o usuário pode montar um perfil semelhante a um currículo, fazer conexões, seguir empresas e candidatar-se a vagas.",
+      "Exige que o usuário já esteja empregado para poder criar uma conta."
+    ],
+    correta: 2
+  }
+];
+/* ============================================================
+   FIM DA CONFIGURAÇÃO — não é necessário editar abaixo
+   ============================================================ */
+
+const LETRAS = ["A","B","C","D"];
+document.getElementById("tituloProva").textContent = TITULO_PROVA;
+document.getElementById("disciplinaProva").textContent = DISCIPLINA;
+document.title = TITULO_PROVA;
+
+/* Embaralhamento (Fisher-Yates) — ordem única por sessão */
+function embaralhar(arr){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* Monta a prova embaralhando questões e alternativas, guardando o gabarito original */
+const prova = embaralhar(QUESTOES.map((q, idx) => ({
+  idOriginal: idx + 1,
+  enunciado: q.enunciado,
+  alts: embaralhar(q.alternativas.map((texto, i) => ({ texto, original: i }))),
+  corretaOriginal: q.correta
+})));
+
+const TOTAL = prova.length;
+const respostas = new Array(TOTAL).fill(null); // índice ORIGINAL da alternativa marcada
+let atual = 0;
+let nome = "", turma = "";
+
+const $ = id => document.getElementById(id);
+
+/* ---------- Etapa 0: identificação ---------- */
+$("btnIniciar").addEventListener("click", () => {
+  nome  = $("nomeAluno").value.trim();
+  turma = $("turmaAluno").value.trim();
+  if (!nome || !turma) { $("avisoIdent").style.display = "block"; return; }
+  $("avisoIdent").style.display = "none";
+  $("etapaIdentificacao").classList.add("oculto");
+  $("etapaQuestoes").classList.remove("oculto");
+  renderizar();
+});
+
+/* ---------- Renderização de uma questão por vez ---------- */
+function renderizar(){
+  const q = prova[atual];
+  $("qNum").textContent = "QUESTÃO " + String(atual + 1).padStart(2, "0");
+  $("qEnunciado").textContent = q.enunciado;
+
+  const area = $("qAlternativas");
+  area.innerHTML = "";
+  q.alts.forEach((alt, i) => {
+    const label = document.createElement("label");
+    label.className = "alt" + (respostas[atual] === alt.original ? " selecionada" : "");
+    label.innerHTML =
+      '<input type="radio" name="alternativa" value="' + alt.original + '"' +
+      (respostas[atual] === alt.original ? " checked" : "") + ">" +
+      '<span class="letra">' + LETRAS[i] + ')</span>' +
+      '<span class="texto"></span>';
+    label.querySelector(".texto").textContent = alt.texto;
+    label.querySelector("input").addEventListener("change", () => {
+      respostas[atual] = alt.original;
+      area.querySelectorAll(".alt").forEach(l => l.classList.remove("selecionada"));
+      label.classList.add("selecionada");
+      atualizarProgresso();
+      $("avisoQuestao").style.display = "none";
+    });
+    area.appendChild(label);
+  });
+
+  $("btnAnterior").style.visibility = atual === 0 ? "hidden" : "visible";
+  const ultima = atual === TOTAL - 1;
+  $("btnProxima").classList.toggle("oculto", ultima);
+  $("btnEnviar").classList.toggle("oculto", !ultima);
+  atualizarProgresso();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function atualizarProgresso(){
+  const feitas = respostas.filter(r => r !== null).length;
+  $("progTexto").textContent = "Questão " + (atual + 1) + " de " + TOTAL;
+  $("progRespondidas").textContent = feitas + " respondida" + (feitas === 1 ? "" : "s");
+  $("progBarra").style.width = ((atual + 1) / TOTAL * 100) + "%";
+}
+
+$("btnProxima").addEventListener("click", () => {
+  if (respostas[atual] === null) {
+    $("avisoQuestao").textContent = "Selecione uma alternativa para continuar.";
+    $("avisoQuestao").style.display = "block";
+    return;
+  }
+  $("avisoQuestao").style.display = "none";
+  atual++;
+  renderizar();
+});
+
+$("btnAnterior").addEventListener("click", () => {
+  if (atual > 0) { $("avisoQuestao").style.display = "none"; atual--; renderizar(); }
+});
+
+/* ---------- Envio ao Formspree ---------- */
+$("btnEnviar").addEventListener("click", async () => {
+  const faltando = respostas.findIndex(r => r === null);
+  if (faltando !== -1) {
+    $("avisoQuestao").textContent =
+      "Ainda há questão sem resposta. Voltando para a questão " + (faltando + 1) + ".";
+    $("avisoQuestao").style.display = "block";
+    atual = faltando;
+    renderizar();
+    return;
+  }
+
+  /* Correção automática (na ordem original das questões) */
+  let acertos = 0;
+  const corrigidas = prova.map((q, pos) => {
+    const escolhida = respostas[pos];
+    const acertou = escolhida === q.corretaOriginal;
+    if (acertou) acertos++;
+    return {
+      questao: q.idOriginal,
+      marcada: LETRAS[escolhida],
+      gabarito: LETRAS[q.corretaOriginal],
+      acertou
+    };
+  }).sort((a, b) => a.questao - b.questao);
+
+  const nota = (acertos / TOTAL * 10).toFixed(1).replace(".", ",");
+  const agora = new Date().toLocaleString("pt-BR");
+
+  const dados = new FormData();
+  dados.append("_subject", "[PROVA] " + turma + " - " + nome + " - Nota " + nota);
+  dados.append("Prova", TITULO_PROVA);
+  dados.append("Nome", nome);
+  dados.append("Turma", turma);
+  dados.append("Nota (0 a 10)", nota + " (" + acertos + " de " + TOTAL + " acertos)");
+  dados.append("Data e hora", agora);
+  corrigidas.forEach(r => {
+    dados.append("Q" + String(r.questao).padStart(2, "0"),
+      "Marcou " + r.marcada + " | Gabarito " + r.gabarito + " | " +
+      (r.acertou ? "CERTA" : "errada"));
+  });
+  const linhaExcel = [nome, turma, nota]
+    .concat(corrigidas.map(r => r.marcada + (r.acertou ? " (C)" : " (E)")))
+    .concat([agora]).join(";");
+  dados.append("RESUMO_EXCEL", linhaExcel);
+
+  const btn = $("btnEnviar");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
+  try {
+    const resp = await fetch("https://formspree.io/f/" + FORMSPREE_ID, {
+      method: "POST",
+      headers: { "Accept": "application/json" },
+      body: dados
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    $("telaProva").classList.add("oculto");
+    $("telaConfirmacao").classList.remove("oculto");
+    window.scrollTo({ top: 0 });
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "Enviar prova";
+    $("avisoQuestao").textContent =
+      "Não foi possível enviar agora. Verifique a conexão com a internet e tente novamente. " +
+      "Se o problema persistir, avise o professor.";
+    $("avisoQuestao").style.display = "block";
+  }
+});
+</script>
+</body>
+</html>
