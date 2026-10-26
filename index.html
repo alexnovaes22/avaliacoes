@@ -55,6 +55,7 @@ pre.code{font-family:var(--mono);font-size:.88rem;background:var(--sunk);border:
 .qnum{background:var(--accent);color:var(--accent-ink);border-radius:8px;min-width:34px;height:34px;display:grid;place-items:center;font-weight:700}
 .topic{color:var(--muted);font-size:.9rem}
 .stem{margin:0 0 6px;font-size:1.05rem}
+.fig{margin:6px 0 12px;text-align:center}.fig img{max-width:100%;height:auto;max-height:340px;border-radius:10px;background:#fff}
 .opts{display:grid;gap:8px;margin-top:12px}
 .opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;background:var(--surface)}
 .opt:hover{border-color:var(--accent)}
@@ -109,6 +110,13 @@ const params=new URLSearchParams(location.search);
 const PROVA_ID=(params.get("p")||"").replace(/[^A-Za-z0-9]/g,"");
 let auth,db,USER=null,PROVA=null,ST=null,TELA=0,ORDEM=null,PREVIEW=false;
 
+function svgNorm(svg){let s=String(svg||"").trim();const head=(s.match(/^<svg[^>]*>/i)||[""])[0];let h=head;
+  if(!/xmlns=/.test(h))h=h.replace(/^<svg/i,'<svg xmlns="http://www.w3.org/2000/svg"');
+  const vb=head.match(/viewBox="\s*[\d.-]+[\s,]+[\d.-]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/i);
+  if(vb&&!/\swidth=/.test(head))h=h.replace(/^<svg/i,`<svg width="${vb[1]}" height="${vb[2]}"`);
+  return head?h+s.slice(head.length):s}
+const svgSrc=svg=>"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svgNorm(svg));
+const altSvg=svg=>((svg.match(/aria-label="([^"]*)"/)||[])[1]||"Imagem da questão");
 /* texto com `código` em linha, de forma segura */
 function rico(el,txt){String(txt||"").split("`").forEach((p,i)=>{if(i%2){const c=document.createElement("code");c.textContent=p;el.appendChild(c)}else el.appendChild(document.createTextNode(p))})}
 function tela(html){$("#app").innerHTML=html;$("#bar").hidden=true}
@@ -226,6 +234,7 @@ function questao(qi){
     partes.forEach((p,k)=>{rico(stem,p);if(k<partes.length-1){const inp=document.createElement("input");inp.className="lac";inp.value=ST.resp[qi][k]||"";inp.setAttribute("aria-label",`Lacuna ${k+1}`);inp.autocomplete="off";inp.spellcheck=false;inp.oninput=()=>{ST.resp[qi][k]=inp.value;salvar();montarNav();barra()};stem.appendChild(inp)}});
   }else rico(stem,q.enunciado);
   if(q.codigo){const pre=document.createElement("pre");pre.className="code";pre.textContent=q.codigo;box.appendChild(pre)}
+  if(q.imagem){const fig=document.createElement("div");fig.className="fig";const img=document.createElement("img");img.src=svgSrc(q.imagem);img.alt=altSvg(q.imagem);fig.appendChild(img);box.insertBefore(fig,stem)}
   if(q.tipo==="mc"){
     const opts=document.createElement("div");opts.className="opts";opts.setAttribute("role","radiogroup");opts.setAttribute("aria-labelledby","st"+qi);
     ORDEM[qi].forEach((orig,pos)=>{

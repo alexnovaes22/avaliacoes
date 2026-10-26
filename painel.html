@@ -95,6 +95,7 @@ td.r,th.r{text-align:right}
 .ca{padding:4px 8px;border-radius:6px;margin:3px 0}
 .ca.correta{background:var(--ok-bg)} .ca.marcada-errada{background:var(--bad-bg)}
 code{font-family:var(--mono);font-size:.88em;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.fig{margin:6px 0 10px;text-align:center}.fig img{max-width:100%;height:auto;max-height:320px;border-radius:10px;background:#fff;border:1px solid var(--line)}
 pre.code{font-family:var(--mono);font-size:.85rem;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;margin:8px 0}
 /* modo mostrar ao aluno */
 #show{position:fixed;inset:0;z-index:100;background:var(--paper);overflow:auto;padding:calc(20px + env(safe-area-inset-top,0px)) 20px calc(40px + env(safe-area-inset-bottom,0px))}
@@ -140,6 +141,14 @@ const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelect
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rico=s=>esc(s).split("`").map((p,i)=>i%2?`<code>${p}</code>`:p).join("");
 const LETRAS="ABCDEFGH";
+function svgNorm(svg){let s=String(svg||"").trim();const head=(s.match(/^<svg[^>]*>/i)||[""])[0];let h=head;
+  if(!/xmlns=/.test(h))h=h.replace(/^<svg/i,'<svg xmlns="http://www.w3.org/2000/svg"');
+  const vb=head.match(/viewBox="\s*[\d.-]+[\s,]+[\d.-]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/i);
+  if(vb&&!/\swidth=/.test(head))h=h.replace(/^<svg/i,`<svg width="${vb[1]}" height="${vb[2]}"`);
+  return head?h+s.slice(head.length):s}
+const svgSrc=svg=>"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svgNorm(svg));
+const altSvg=svg=>((svg.match(/aria-label="([^"]*)"/)||[])[1]||"Imagem da questão");
+const svgOk=svg=>/^\s*<svg[\s>]/i.test(svg||"")&&!/<script|on\w+\s*=|javascript:/i.test(svg);
 const norm=s=>String(s??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
 const nf1=v=>(Math.round(v*10)/10).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1});
 function toast(m){const t=document.createElement("div");t.className="toast";t.setAttribute("role","status");t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
@@ -297,7 +306,7 @@ async function copiar(t){try{await navigator.clipboard.writeText(t);toast("Link 
 
 /* ================= EDITOR ================= */
 let ED=null;
-function novaQuestao(tipo="mc"){return {tipo,topico:"",enunciado:"",codigo:"",peso:1,anulada:false,alternativas:["","","","",""],correta:-1,afirmacoes:[{texto:"",v:true},{texto:"",v:true}]}}
+function novaQuestao(tipo="mc"){return {tipo,topico:"",enunciado:"",codigo:"",imagem:"",peso:1,anulada:false,alternativas:["","","","",""],correta:-1,afirmacoes:[{texto:"",v:true},{texto:"",v:true}]}}
 async function editor(p){
   if(p){const g=await db.collection("gabaritos").doc(p.id).get();ED={id:p.id,status:p.status,...(g.exists?JSON.parse(g.data().fonte):{titulo:p.titulo,questoes:[]})}}
   else ED={id:null,status:"rascunho",titulo:"",instrucoes:"",valor:10,embaralhar:true,disciplinaId:FILTRO.disc||"",questoes:[novaQuestao()]};
@@ -306,6 +315,7 @@ async function editor(p){
 function lacunas(txt){const r=[];txt.replace(/\[\[(.+?)\]\]/g,(_,a)=>{r.push(a.split("|").map(s=>s.trim()).filter(Boolean));return""});return r}
 function faltas(){const f=[];ED.questoes.forEach((q,i)=>{
   if(!q.enunciado.trim())f.push([i,"sem enunciado"]);
+  if(q.imagem&&!svgOk(q.imagem))f.push([i,"imagem inválida"]);
   if(q.tipo==="mc"){if(q.alternativas.filter(a=>a.trim()).length<2)f.push([i,"menos de 2 alternativas"]);else if(q.correta<0||!q.alternativas[q.correta]?.trim())f.push([i,"alternativa correta não marcada"])}
   if(q.tipo==="vf"&&!q.afirmacoes.some(a=>a.texto.trim()))f.push([i,"sem afirmações"]);
   if(q.tipo==="lacuna"&&!lacunas(q.enunciado).length)f.push([i,"sem lacunas [[ ]] no enunciado"]);
@@ -316,7 +326,7 @@ function desenharEditor(){
   $("#view").innerHTML=`
   <section class="panel">
     <div class="panel-h"><h2>${ED.id?"Editar prova":"Nova prova"} <span class="pill ${ED.status}">${{rascunho:"Rascunho",aberta:"Aberta",encerrada:"Encerrada"}[ED.status]}</span></h2>
-      <div class="row"><button class="btn" id="eImp">Importar prova antiga (.html)</button><input type="file" id="eImpF" accept=".html,.htm" hidden><button class="btn" id="eVoltar">Voltar</button></div></div>
+      <div class="row"><button class="btn" id="eImp">Importar prova (.html ou .json)</button><input type="file" id="eImpF" accept=".html,.htm,.json" hidden><button class="btn" id="eVoltar">Voltar</button></div></div>
     <div class="row">
       <label class="f" style="flex:3;min-width:240px">Título<input type="text" id="eTit" value="${esc(ED.titulo)}"></label>
       <label class="f" style="flex:2;min-width:220px">Disciplina e turma<select id="eDis"><option value="">Escolha…</option>${ds.map(d=>`<option value="${d.id}" ${ED.disciplinaId===d.id?"selected":""}>${esc(d.nome)} · ${esc(turma(d.turmaId)?.nome)}</option>`).join("")}</select></label>
@@ -358,6 +368,9 @@ function qHTML(q,i,falta){
     <div class="row"><label class="f" style="flex:1">Tópico (opcional)<input type="text" data-q="${i}" data-k="topico" value="${esc(q.topico)}"></label></div>
     <label class="f" style="margin-top:8px">Enunciado<textarea data-q="${i}" data-k="enunciado" rows="3">${esc(q.enunciado)}</textarea></label>
     <label class="f" style="margin-top:8px">Bloco de código (opcional)<textarea class="code" data-q="${i}" data-k="codigo" rows="${q.codigo?Math.min(10,q.codigo.split("\n").length+1):2}">${esc(q.codigo)}</textarea></label>
+    <details style="margin-top:8px" ${q.imagem?"open":""}><summary class="small" style="cursor:pointer;font-weight:700">Imagem (código SVG, opcional)${q.imagem?" · com imagem":""}</summary>
+      <textarea class="code" data-q="${i}" data-k="imagem" data-img rows="3" placeholder="<svg ...>...</svg>">${esc(q.imagem||"")}</textarea>
+      ${q.imagem?(svgOk(q.imagem)?`<div class="fig"><img src="${svgSrc(q.imagem)}" alt="${esc(altSvg(q.imagem))}"></div>`:'<p class="small" style="color:var(--bad)">Código inválido: precisa começar com &lt;svg e não pode conter scripts.</p>'):""}</details>
     ${corpo}</div>`;
 }
 function lerCabecalho(){ED.titulo=$("#eTit").value.trim();ED.disciplinaId=$("#eDis").value;ED.valor=+$("#eVal").value||0;ED.embaralhar=$("#eEmb").value==="1";ED.instrucoes=$("#eIns").value}
@@ -365,6 +378,7 @@ function ligarEditor(){
   const redesenha=()=>{lerCabecalho();const y=scrollY;desenharEditor();scrollTo(0,y)};
   $$("[data-k]").forEach(el=>el.oninput=()=>{const q=ED.questoes[+el.dataset.q];q[el.dataset.k]=el.dataset.k==="peso"?(+el.value||0):el.value});
   $$("[data-k=enunciado]").forEach(el=>el.onchange=()=>{if(ED.questoes[+el.dataset.q].tipo==="lacuna")redesenha()});
+  $$("[data-img]").forEach(el=>el.onchange=()=>redesenha());
   $$("[data-alt]").forEach(el=>el.oninput=()=>{ED.questoes[+el.dataset.q].alternativas[+el.dataset.alt]=el.value});
   $$("[data-correta]").forEach(el=>el.onchange=()=>{ED.questoes[+el.dataset.q].correta=+el.dataset.correta;redesenha()});
   $$("[data-af]").forEach(el=>el.oninput=()=>{ED.questoes[+el.dataset.q].afirmacoes[+el.dataset.af].texto=el.value});
@@ -388,20 +402,29 @@ function ligarEditor(){
   $("#eLink")?.addEventListener("click",()=>copiar(linkProva(ED.id)));
   $("#eDel")?.addEventListener("click",async()=>{if(!confirm("Excluir esta prova?"))return;await db.collection("provas").doc(ED.id).delete();await db.collection("gabaritos").doc(ED.id).delete();await carregarTudo();SUB=null;render();toast("Prova excluída")});
 }
-function importarAntiga(html){
+function importarAntiga(txt){
   lerCabecalho();
-  const m=html.match(/const\s+BANK\s*=\s*(\[[\s\S]*?\]);\s*\n/);
-  if(!m){alert("Não encontrei as questões neste arquivo. Ele precisa ter a lista BANK das suas avaliações HTML.");return}
-  let bank;try{bank=JSON.parse(m[1])}catch{alert("Não consegui ler as questões deste arquivo.");return}
-  const tit=(html.match(/titulo\s*:\s*"([^"]+)"/)||[])[1];
-  const qs=bank.map(b=>({...novaQuestao("mc"),topico:b.t||"",enunciado:b.e||"",codigo:b.code||"",alternativas:(b.o||[]).slice(0,8),correta:typeof b.c==="number"?b.c:-1}));
+  let qs=null,tit=null,meta={};
+  try{const j=JSON.parse(txt);if(j&&j.tipoArquivo==="prova-sistema"&&Array.isArray(j.questoes)){qs=j.questoes.map(q=>({...novaQuestao(q.tipo||"mc"),...q}));tit=j.titulo;meta=j}}catch{}
+  if(!qs){
+    const pega=nome=>{const m=txt.match(new RegExp("const\\s+"+nome+"\\s*=\\s*(\\[[\\s\\S]*?\\]);\\s*\\n"));if(!m)return null;try{return JSON.parse(m[1])}catch{return null}};
+    const bank=pega("BANK"),quest=pega("QUESTIONS");
+    if(bank)qs=bank.map(b=>({...novaQuestao("mc"),topico:b.t||"",enunciado:b.e||"",codigo:b.code||"",imagem:b.img||"",alternativas:(b.o||[]).slice(0,8),correta:typeof b.c==="number"?b.c:-1}));
+    else if(quest)qs=quest.map(b=>({...novaQuestao("mc"),enunciado:b.text||"",imagem:b.img||"",alternativas:(b.opts||[]).slice(0,8),correta:typeof b.c==="number"?b.c:-1}));
+    tit=(txt.match(/titulo\s*:\s*"([^"]+)"/)||txt.match(/<h1>([^<]+)<\/h1>/)||[])[1];
+  }
+  if(!qs||!qs.length){alert("Não encontrei questões neste arquivo. Aceito: arquivo .json gerado para o sistema, ou provas HTML antigas com a lista BANK ou QUESTIONS.");return}
   const vazio=ED.questoes.length===1&&!ED.questoes[0].enunciado.trim();
-  ED.questoes=vazio?qs:ED.questoes.concat(qs);if(!ED.titulo&&tit)ED.titulo=tit;
-  desenharEditor();toast(`${qs.length} questões importadas. Marque a alternativa correta de cada uma.`);
+  ED.questoes=vazio?qs:ED.questoes.concat(qs);
+  if(!ED.titulo&&tit)ED.titulo=tit.replace(/^Prova:\s*/i,"").trim();
+  if(meta.instrucoes&&!ED.instrucoes)ED.instrucoes=meta.instrucoes;
+  if(typeof meta.valor==="number")ED.valor=meta.valor;
+  const sem=qs.filter(q=>q.tipo==="mc"&&q.correta<0).length;
+  desenharEditor();toast(`${qs.length} questões importadas.${sem?` Marque a alternativa correta de ${sem} delas.`:" Gabarito já marcado."}`);
 }
 function publico(fonte){
   return fonte.questoes.map(q=>{
-    const b={tipo:q.tipo,topico:q.topico||"",codigo:q.codigo||"",peso:q.peso,anulada:!!q.anulada};
+    const b={tipo:q.tipo,topico:q.topico||"",codigo:q.codigo||"",imagem:svgOk(q.imagem)?q.imagem.trim():"",peso:q.peso,anulada:!!q.anulada};
     if(q.tipo==="mc"){const alts=q.alternativas.map(a=>a.trim());b.enunciado=q.enunciado;b.alternativas=alts}
     if(q.tipo==="vf"){b.enunciado=q.enunciado;b.afirmacoes=q.afirmacoes.filter(a=>a.texto.trim()).map(a=>a.texto.trim())}
     if(q.tipo==="lacuna"){b.enunciado=q.enunciado.replace(/\[\[(.+?)\]\]/g,"{{#}}")}
@@ -496,7 +519,7 @@ function corrigidaHTML(l){
       if(q.tipo==="lacuna")corpo=d.g.map((acc,k)=>{const r=(d.r||[])[k]||"",ok=acc.some(a=>norm(a)===norm(r));return `<div class="ca ${ok?"correta":"marcada-errada"}">Lacuna ${k+1}: <b>${esc(r||"sem resposta")}</b> · Aceitas: ${esc(acc.join(" / "))}</div>`}).join("");
       const enun=q.tipo==="lacuna"?rico(q.enunciado).replace(/\{\{#\}\}/g,"_____"):rico(q.enunciado);
       return `<div class="cq ${cls}"><div class="cq-h"><span>Questão ${i+1}${q.topico?` · <span class="muted">${esc(q.topico)}</span>`:""}</span><span>${q.anulada?"Anulada":d.frac===1?"Certa":d.frac===0?"Errada":`Parcial (${Math.round(d.frac*100)}%)`}</span></div>
-        <p style="margin:0 0 6px">${enun}</p>${q.codigo?`<pre class="code">${esc(q.codigo)}</pre>`:""}${corpo}</div>`}).join("")}`;
+        ${q.imagem?`<div class="fig"><img src="${svgSrc(q.imagem)}" alt="${esc(altSvg(q.imagem))}"></div>`:""}<p style="margin:0 0 6px">${enun}</p>${q.codigo?`<pre class="code">${esc(q.codigo)}</pre>`:""}${corpo}</div>`}).join("")}`;
 }
 function verAluno(i){
   const l=RES.linhas[i];
@@ -528,7 +551,11 @@ function exportarNotas(){
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Notas");
   XLSX.writeFile(wb,`notas-${prova.titulo}-${prova.turmaNome}.xlsx`.replace(/[\\/:*?"<>|]/g,"-"));
 }
-function pdfProvas(lista,nome){
+async function svgPng(svg){
+  return new Promise(res=>{const img=new Image();img.onload=()=>{const w=img.naturalWidth||520,h=img.naturalHeight||220,c=document.createElement("canvas");c.width=w*2;c.height=h*2;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);res({url:c.toDataURL("image/png"),w,h})};img.onerror=()=>res(null);img.src=svgSrc(svg)});
+}
+async function pdfProvas(lista,nome){
+  const IMGS={};for(const [i,q] of RES.prova.questoes.entries())if(q.imagem)IMGS[i]=await svgPng(q.imagem);
   const {jsPDF}=window.jspdf,doc=new jsPDF({unit:"pt",format:"a4"}),W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=40,LW=W-2*M;
   const limpa=s=>String(s??"").replace(/`/g,"").replace(/[\u00a0\u202f]/g," ").replace(/[^\x00-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2026]/g,"?");
   let y=0;
@@ -544,6 +571,7 @@ function pdfProvas(lista,nome){
       const d=l.c.det[i],sit=q.anulada?"ANULADA":d.frac===1?"CERTA":d.frac===0?"ERRADA":`PARCIAL (${Math.round(d.frac*100)}%)`;
       if(y>H-90){doc.addPage();y=50}
       txt(`Questão ${i+1} · ${sit}${q.topico?` · ${q.topico}`:""}`,{bold:true,cor:d.frac===1||q.anulada?[47,122,74]:d.frac===0?[166,58,50]:[150,100,30]});
+      if(IMGS[i]){const iw=Math.min(LW*0.75,IMGS[i].w),ih=iw*IMGS[i].h/IMGS[i].w;if(y+ih>H-50){doc.addPage();y=50}doc.addImage(IMGS[i].url,"PNG",M+(LW-iw)/2,y,iw,ih,undefined,"FAST");y+=ih+8}
       txt(q.tipo==="lacuna"?q.enunciado.replace(/\{\{#\}\}/g,"_____"):q.enunciado);
       if(q.codigo){q.codigo.split("\n").forEach(c=>txt(c||" ",{mono:true,size:8.5,ind:12}))}
       if(q.tipo==="mc"){q.alternativas.forEach((a,k)=>txt(`${k===d.r?"[X]":"[ ]"} ${LETRAS[k]}) ${a}${k===d.g?"   <- correta":""}`,{ind:10,bold:k===d.g,cor:k===d.r&&k!==d.g?[166,58,50]:k===d.g?[47,122,74]:[27,36,48]}));if(d.r<0||d.r==null)txt("Sem resposta",{ind:10,cor:[166,58,50]})}
