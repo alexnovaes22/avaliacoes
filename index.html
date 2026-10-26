@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Avaliação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --paper:#F3F4EF; --surface:#FFFFFF; --sunk:#F7F8F4; --ink:#1B2430; --muted:#5B6672; --line:#D6DAD2;
+  --accent:#1F5F8B; --accent-ink:#FFFFFF; --ok:#2F7A4A; --bad:#A63A32; --warn-bg:#F6EDD6; --sel:#E3EEF6;
+  --font:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{--paper:#12171C;--surface:#1A2129;--sunk:#151B21;--ink:#E6EAED;--muted:#9AA6B0;--line:#2D3742;
+    --accent:#6FA8D6;--accent-ink:#0E1620;--ok:#6FBF8A;--bad:#E27A72;--warn-bg:#3A3120;--sel:#1E3346;color-scheme:dark}
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:20px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+.wrap{max-width:760px;margin:0 auto;padding:24px 18px 120px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px}
+h1{font-size:1.6rem;line-height:1.2;margin:0 0 6px}
+h2{font-size:1.25rem;margin:0 0 10px}
+.muted{color:var(--muted)} .small{font-size:.88rem}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--muted);font-size:.92rem;margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:11px 18px;font-weight:700;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.center{text-align:center}
+.big-ok{font-size:3rem;line-height:1;margin-bottom:8px}
+.alert{background:var(--warn-bg);border-left:4px solid #B9782A;border-radius:6px;padding:10px 14px;margin:12px 0;font-size:.95rem}
+code{font-family:var(--mono);font-size:.9em;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+pre.code{font-family:var(--mono);font-size:.88rem;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre;margin:10px 0}
+.nav{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0}
+.nav button{all:unset;cursor:pointer;min-width:36px;height:36px;display:inline-grid;place-items:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-weight:700;font-size:.9rem;padding:0 8px}
+.nav button.feita{background:var(--sel);border-color:var(--accent)}
+.nav button[aria-current]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.nav button:focus-visible{outline:3px solid var(--accent)}
+.qhead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.qnum{background:var(--accent);color:var(--accent-ink);border-radius:8px;min-width:34px;height:34px;display:grid;place-items:center;font-weight:700}
+.topic{color:var(--muted);font-size:.9rem}
+.stem{margin:0 0 6px;font-size:1.05rem}
+.opts{display:grid;gap:8px;margin-top:12px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;background:var(--surface)}
+.opt:hover{border-color:var(--accent)}
+.opt.sel{background:var(--sel);border-color:var(--accent)}
+.opt input{margin-top:5px}
+.letter{font-weight:700;min-width:22px}
+.vf{display:grid;gap:8px;margin-top:12px}
+.vf-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.vf-row .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.vf-row .seg label{padding:6px 14px;cursor:pointer;font-weight:700}
+.vf-row .seg input{position:absolute;opacity:0;pointer-events:none}
+.vf-row .seg label:has(input:checked){background:var(--accent);color:var(--accent-ink)}
+.vf-row .seg label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:-3px}
+.lac{display:inline-block;min-width:120px;max-width:100%;border:0;border-bottom:2px solid var(--accent);background:var(--sel);padding:2px 6px;margin:0 2px;border-radius:4px 4px 0 0}
+.lac:focus{outline:2px solid var(--accent)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:10px 18px calc(10px + env(safe-area-inset-bottom,0px))}
+.bar-in{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.prog{flex:1;min-width:0}
+.prog .txt{font-size:.85rem;color:var(--muted)}
+.track{height:6px;background:var(--sunk);border-radius:99px;overflow:hidden;margin-top:4px}
+.fill{height:100%;background:var(--accent);width:0}
+.rev-list{list-style:none;padding:0;margin:0} .rev-list li{margin:6px 0}
+.rev-list .vazia{color:var(--bad);font-weight:700}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;font-size:.9rem;color:var(--muted)}
+.top button{all:unset;cursor:pointer;color:var(--accent);font-weight:700}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);max-width:min(460px,92vw);padding:22px}
+dialog::backdrop{background:rgba(10,15,20,.5)}
+.acts{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.preview{background:#7a4ea3;color:#fff;text-align:center;padding:8px;font-weight:700;font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="preview" id="preview" hidden>Pré-visualização do professor: o envio está desativado.</div>
+<main class="wrap" id="app" aria-live="polite">
+  <div class="card center"><p class="muted">Carregando…</p></div>
+</main>
+<div class="bar" id="bar" hidden>
+  <div class="bar-in">
+    <div class="prog"><div class="txt" id="progTxt"></div><div class="track"><div class="fill" id="progFill"></div></div></div>
+    <button class="btn" id="bAnt">Anterior</button>
+    <button class="btn primary" id="bProx">Próxima</button>
+  </div>
+</div>
+<dialog id="dlg"><h2 id="dlgT"></h2><div id="dlgB"></div><div class="acts" id="dlgA"></div></dialog>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const LETRAS="ABCDEFGH";
+const params=new URLSearchParams(location.search);
+const PROVA_ID=(params.get("p")||"").replace(/[^A-Za-z0-9]/g,"");
+let auth,db,USER=null,PROVA=null,ST=null,TELA=0,ORDEM=null,PREVIEW=false;
+
+/* texto com `código` em linha, de forma segura */
+function rico(el,txt){String(txt||"").split("`").forEach((p,i)=>{if(i%2){const c=document.createElement("code");c.textContent=p;el.appendChild(c)}else el.appendChild(document.createTextNode(p))})}
+function tela(html){$("#app").innerHTML=html;$("#bar").hidden=true}
+function dialogo(t,corpo,botoes){
+  const d=$("#dlg");$("#dlgT").textContent=t;$("#dlgB").innerHTML=corpo;const a=$("#dlgA");a.innerHTML="";
+  return new Promise(res=>{botoes.forEach(([txt,val,cls])=>{const b=document.createElement("button");b.className="btn "+(cls||"");b.textContent=txt;b.onclick=()=>{d.close();res(val)};a.appendChild(b)});d.showModal()});
+}
+
+/* ---------- embaralhamento determinístico por aluno ---------- */
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function ordem(seed){const R=rng(seed);return PROVA.questoes.map(q=>{const n=q.tipo==="mc"?q.alternativas.length:0;const a=[...Array(n).keys()];if(PROVA.embaralhar)for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a})}
+
+/* ---------- rascunho local ---------- */
+const chave=()=>`prova_${PROVA_ID}_${USER.uid}`;
+function novoEstado(){return {seed:Math.floor(Math.random()*2147483647),inicio:Date.now(),resp:PROVA.questoes.map(q=>q.tipo==="mc"?-1:q.tipo==="vf"?q.afirmacoes.map(()=>""):Array((q.enunciado.match(/\{\{#\}\}/g)||[]).length).fill(""))}}
+function carregar(){try{const s=JSON.parse(localStorage.getItem(chave()));if(s&&Array.isArray(s.resp)&&s.resp.length===PROVA.questoes.length)return s}catch{}return novoEstado()}
+function salvar(){try{localStorage.setItem(chave(),JSON.stringify({...ST,tela:TELA}))}catch{}}
+function respondida(i){const q=PROVA.questoes[i],r=ST.resp[i];if(q.tipo==="mc")return r>=0;if(q.tipo==="vf")return r.every(x=>x);return r.every(x=>String(x).trim())}
+
+/* ---------- início ---------- */
+async function iniciar(){
+  if(!window.firebase||!window.FIREBASE_CONFIG){tela(`<div class="card"><h1>Não foi possível carregar</h1><p>Verifique a internet e recarregue a página.</p></div>`);return}
+  firebase.initializeApp(FIREBASE_CONFIG);auth=firebase.auth();db=firebase.firestore();
+  await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+  if(!PROVA_ID){tela(`<div class="card"><h1>Link incompleto</h1><p>Abra a prova pelo link enviado pelo professor.</p></div>`);return}
+  auth.onAuthStateChanged(u=>{USER=u;u?abrir():telaLogin()});
+}
+function telaLogin(msg){
+  tela(`<div class="card center">
+    <h1>Avaliação</h1>
+    <p>Entre com a sua conta Google da escola para fazer a prova.</p>
+    ${msg?`<div class="alert">${esc(msg)}</div>`:""}
+    <p><button class="btn primary" id="bGoogle">Entrar com Google</button></p>
+    <p class="small muted">Use o e-mail institucional cadastrado pelo professor.</p></div>`);
+  $("#bGoogle").onclick=entrar;
+}
+async function entrar(){
+  const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
+  try{await auth.signInWithPopup(p)}
+  catch(e){
+    if(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment"){try{await auth.signInWithRedirect(p);return}catch{}}
+    if(e.code==="auth/popup-closed-by-user"||e.code==="auth/cancelled-popup-request")return;
+    telaLogin(e.code==="auth/network-request-failed"?"Sem conexão com a internet.":"Não foi possível entrar. Se aparecer “acesso bloqueado”, avise o professor.");
+  }
+}
+async function sair(){try{await auth.signOut()}catch{}}
+
+async function abrir(){
+  tela(`<div class="card center"><p class="muted">Abrindo a prova…</p></div>`);
+  PREVIEW=(USER.email||"").toLowerCase()===String(PROFESSOR_EMAIL).toLowerCase();
+  $("#preview").hidden=!PREVIEW;
+  if(!PREVIEW){
+    try{const r=await db.collection("recibos").doc(`${PROVA_ID}_${USER.uid}`).get();if(r.exists){enviada(r.data().enviadoEm);return}}catch{}
+  }
+  try{const d=await db.collection("provas").doc(PROVA_ID).get();if(!d.exists)throw{code:"not-found"};PROVA=d.data()}
+  catch(e){
+    tela(`<div class="card"><div class="top"><span>${esc(USER.email)}</span><button id="bSair">Trocar de conta</button></div>
+      <h1>Prova indisponível</h1>
+      <p>${e.code==="not-found"?"Esta prova não existe. Confira o link.":"Esta prova não está aberta ou o seu e-mail não está na lista da turma."}</p>
+      <p class="muted small">Se acha que é um engano, mostre esta tela ao professor.</p></div>`);
+    $("#bSair").onclick=sair;return;
+  }
+  ST=carregar();ORDEM=ordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
+  document.title=PROVA.titulo;mostrar(TELA);
+}
+function enviada(ts){
+  const quando=ts&&ts.toDate?ts.toDate().toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"";
+  tela(`<div class="card center">
+    <div class="big-ok" aria-hidden="true">✓</div>
+    <h1>Prova enviada, aguardando correção</h1>
+    ${quando?`<p class="muted">Enviada em ${esc(quando)}.</p>`:""}
+    <p>Você já pode fechar esta página.</p>
+    <p><button class="btn" id="bSair">Sair da conta</button></p></div>`);
+  $("#bSair").onclick=sair;
+}
+
+/* ---------- telas da prova ---------- */
+const N=()=>PROVA.questoes.length, ULT=()=>N()+1;
+function cabecalho(){
+  return `<div class="top"><span>${esc(USER.displayName||USER.email)}</span><button id="bSair">Sair</button></div>
+  <h1>${esc(PROVA.titulo)}</h1>
+  <div class="meta"><span>${esc(PROVA.escolaNome||"")}</span><span>${esc(PROVA.turmaNome||"")}</span><span>${esc(PROVA.disciplinaNome||"")}</span>${PROVA.valor?`<span>Valor: ${esc(PROVA.valor)} pontos</span>`:""}</div>
+  <nav class="nav" id="nav" aria-label="Ir para a questão"></nav>`;
+}
+function mostrar(i){
+  TELA=Math.max(0,Math.min(ULT(),i));salvar();
+  let corpo="";
+  if(TELA===0){
+    corpo=`<section class="card"><h2>Antes de começar</h2>
+      ${PROVA.instrucoes?`<p style="white-space:pre-line">${esc(PROVA.instrucoes)}</p>`:""}
+      <p>São ${N()} questões. Suas respostas ficam salvas neste navegador enquanto você responde.</p>
+      <p><b>Você só pode enviar uma vez.</b> Depois do envio, não é possível alterar as respostas.</p></section>`;
+  }else if(TELA===ULT()){
+    const faltam=PROVA.questoes.map((_,k)=>k).filter(k=>!respondida(k));
+    corpo=`<section class="card"><h2>Revisão</h2>
+      <p>${faltam.length?`Faltam <b>${faltam.length}</b> questão(ões) sem resposta completa.`:"Todas as questões estão respondidas."}</p>
+      <ol class="rev-list">${PROVA.questoes.map((q,k)=>`<li><button class="btn" style="padding:2px 10px" data-ir="${k+1}">Questão ${k+1}</button> ${respondida(k)?"respondida":'<span class="vazia">incompleta</span>'}</li>`).join("")}</ol>
+      <div class="acts" style="justify-content:flex-start"><button class="btn primary" id="bEnviar" ${PREVIEW?"disabled":""}>Enviar prova</button></div></section>`;
+  }else corpo=`<section class="card" id="qcard"></section>`;
+  tela(cabecalho()+corpo);
+  $("#bSair").onclick=async()=>{const r=await dialogo("Sair?","<p>Suas respostas continuam salvas neste navegador, mas a prova <b>não foi enviada</b>.</p>",[["Continuar a prova",0],["Sair",1,"primary"]]);if(r)sair()};
+  if(TELA>0&&TELA<ULT())questao(TELA-1);
+  document.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>mostrar(+b.dataset.ir));
+  $("#bEnviar")?.addEventListener("click",enviar);
+  montarNav();barra();window.scrollTo({top:0});
+}
+function questao(qi){
+  const q=PROVA.questoes[qi],box=$("#qcard");
+  const head=document.createElement("div");head.className="qhead";
+  head.innerHTML=`<span class="qnum">${qi+1}</span><span class="topic"></span>`;head.querySelector(".topic").textContent=q.topico||"";
+  box.appendChild(head);
+  const stem=document.createElement("p");stem.className="stem";stem.id="st"+qi;box.appendChild(stem);
+  if(q.tipo==="lacuna"){
+    const partes=q.enunciado.split("{{#}}");
+    partes.forEach((p,k)=>{rico(stem,p);if(k<partes.length-1){const inp=document.createElement("input");inp.className="lac";inp.value=ST.resp[qi][k]||"";inp.setAttribute("aria-label",`Lacuna ${k+1}`);inp.autocomplete="off";inp.spellcheck=false;inp.oninput=()=>{ST.resp[qi][k]=inp.value;salvar();montarNav();barra()};stem.appendChild(inp)}});
+  }else rico(stem,q.enunciado);
+  if(q.codigo){const pre=document.createElement("pre");pre.className="code";pre.textContent=q.codigo;box.appendChild(pre)}
+  if(q.tipo==="mc"){
+    const opts=document.createElement("div");opts.className="opts";opts.setAttribute("role","radiogroup");opts.setAttribute("aria-labelledby","st"+qi);
+    ORDEM[qi].forEach((orig,pos)=>{
+      const lab=document.createElement("label");lab.className="opt";
+      const inp=document.createElement("input");inp.type="radio";inp.name="q"+qi;
+      if(ST.resp[qi]===orig){inp.checked=true;lab.classList.add("sel")}
+      inp.onchange=()=>{ST.resp[qi]=orig;salvar();opts.querySelectorAll(".opt").forEach(o=>o.classList.remove("sel"));lab.classList.add("sel");montarNav();barra()};
+      const l=document.createElement("span");l.className="letter";l.textContent=LETRAS[pos]+")";
+      const t=document.createElement("span");rico(t,q.alternativas[orig]);
+      lab.append(inp,l,t);opts.appendChild(lab);
+    });box.appendChild(opts);
+  }
+  if(q.tipo==="vf"){
+    const vf=document.createElement("div");vf.className="vf";
+    q.afirmacoes.forEach((af,k)=>{
+      const row=document.createElement("div");row.className="vf-row";
+      const t=document.createElement("span");rico(t,`${k+1}. ${af}`);
+      const seg=document.createElement("span");seg.className="seg";seg.setAttribute("role","radiogroup");seg.setAttribute("aria-label",`Afirmação ${k+1}`);
+      ["V","F"].forEach(v=>{const lab=document.createElement("label");const inp=document.createElement("input");inp.type="radio";inp.name=`q${qi}_${k}`;inp.value=v;inp.checked=ST.resp[qi][k]===v;inp.onchange=()=>{ST.resp[qi][k]=v;salvar();montarNav();barra()};lab.append(inp,document.createTextNode(v==="V"?"Verdadeiro":"Falso"));seg.appendChild(lab)});
+      row.append(t,seg);vf.appendChild(row);
+    });box.appendChild(vf);
+  }
+}
+function montarNav(){
+  const nav=$("#nav");if(!nav)return;nav.innerHTML="";
+  const mk=(txt,i,feita,label)=>{const b=document.createElement("button");b.textContent=txt;if(feita)b.className="feita";if(TELA===i)b.setAttribute("aria-current","step");b.setAttribute("aria-label",label);b.onclick=()=>mostrar(i);nav.appendChild(b)};
+  mk("Início",0,false,"Início");
+  PROVA.questoes.forEach((_,k)=>mk(String(k+1),k+1,respondida(k),`Questão ${k+1}${respondida(k)?", respondida":", sem resposta"}`));
+  mk("Revisão",ULT(),false,"Revisão e envio");
+}
+function barra(){
+  $("#bar").hidden=false;const n=PROVA.questoes.filter((_,k)=>respondida(k)).length;
+  $("#progTxt").textContent=`${n} de ${N()} respondidas`;$("#progFill").style.width=(n/N()*100)+"%";
+  $("#bAnt").disabled=TELA===0;$("#bProx").hidden=TELA===ULT();
+  $("#bProx").textContent=TELA===0?"Começar":TELA===N()?"Revisar":"Próxima";
+}
+$("#bAnt").onclick=()=>mostrar(TELA-1);$("#bProx").onclick=()=>mostrar(TELA+1);
+
+/* ---------- envio ---------- */
+async function enviar(){
+  if(PREVIEW)return;
+  const faltam=PROVA.questoes.filter((_,k)=>!respondida(k)).length;
+  const ok=await dialogo("Enviar a prova?",`${faltam?`<p class="alert">Ainda há <b>${faltam}</b> questão(ões) incompleta(s).</p>`:""}<p>Depois de enviar, <b>não é possível alterar</b> as respostas.</p>`,[["Voltar",0],["Enviar agora",1,"primary"]]);
+  if(!ok)return;
+  const b=$("#bEnviar");b.disabled=true;b.textContent="Enviando…";
+  const id=`${PROVA_ID}_${USER.uid}`,ts=firebase.firestore.FieldValue.serverTimestamp();
+  const resp=ST.resp.map(r=>Array.isArray(r)?r.map(x=>String(x).slice(0,200)):r);
+  const batch=db.batch();
+  batch.set(db.collection("respostas").doc(id),{provaId:PROVA_ID,turmaId:PROVA.turmaId,uid:USER.uid,email:(USER.email||"").toLowerCase(),nome:USER.displayName||"",seed:ST.seed,respostas:JSON.stringify(resp),inicioEm:ST.inicio,enviadoEm:ts});
+  batch.set(db.collection("recibos").doc(id),{uid:USER.uid,provaId:PROVA_ID,enviadoEm:ts});
+  try{await batch.commit();localStorage.removeItem(chave());enviada(firebase.firestore.Timestamp.now())}
+  catch(e){
+    b.disabled=false;b.textContent="Enviar prova";
+    const msg=e.code==="permission-denied"?"O envio foi recusado. A prova pode ter sido encerrada ou já foi enviada antes. Suas respostas continuam salvas neste navegador: mostre esta tela ao professor.":"Não consegui enviar. Verifique a internet e tente de novo. Suas respostas continuam salvas.";
+    dialogo("Não foi enviado",`<p>${msg}</p>`,[["Entendi",0,"primary"]]);
+  }
+}
+window.addEventListener("beforeunload",e=>{if(PROVA&&ST&&!PREVIEW&&document.querySelector(".nav")){e.preventDefault();e.returnValue=""}});
+iniciar();
+</script>
+</body>
+</html>

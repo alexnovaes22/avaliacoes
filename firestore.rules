@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    // Professor: único e-mail com acesso total
+    function prof() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == 'alex.novaes@escola.pr.gov.br';
+    }
+    function emailAluno() { return request.auth.token.email.lower(); }
+    function prova(id) { return get(/databases/$(db)/documents/provas/$(id)).data; }
+    function naTurma(turmaId) {
+      return request.auth != null
+        && emailAluno() in get(/databases/$(db)/documents/turmas/$(turmaId)).data.emails;
+    }
+
+    // Cadastros e gabaritos: só o professor
+    match /escolas/{id}     { allow read, write: if prof(); }
+    match /turmas/{id}      { allow read, write: if prof(); }
+    match /disciplinas/{id} { allow read, write: if prof(); }
+    match /gabaritos/{id}   { allow read, write: if prof(); }
+
+    // Prova (sem gabarito): o aluno da turma lê enquanto estiver aberta
+    match /provas/{id} {
+      allow read: if prof();
+      allow get: if request.auth != null
+        && resource.data.status == 'aberta'
+        && naTurma(resource.data.turmaId);
+      allow write: if prof();
+    }
+
+    // Respostas: o aluno só cria (uma vez); nunca lê, altera ou apaga
+    match /respostas/{id} {
+      allow read, delete: if prof();
+      allow update: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['provaId','turmaId','uid','email','nome','seed','respostas','inicioEm','enviadoEm'])
+        && id == request.resource.data.provaId + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == emailAluno()
+        && request.resource.data.respostas is string
+        && request.resource.data.respostas.size() < 50000
+        && request.resource.data.enviadoEm == request.time
+        && prova(request.resource.data.provaId).status == 'aberta'
+        && request.resource.data.turmaId == prova(request.resource.data.provaId).turmaId
+        && naTurma(request.resource.data.turmaId);
+    }
+
+    // Recibo: só a data do envio, para o aluno ver "Prova enviada"
+    match /recibos/{id} {
+      allow read, delete: if prof();
+      allow get: if request.auth != null && id.matches('^[A-Za-z0-9]+_' + request.auth.uid + '$');
+      allow update: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid','provaId','enviadoEm'])
+        && request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.provaId + '_' + request.auth.uid
+        && request.resource.data.enviadoEm == request.time
+        && existsAfter(/databases/$(db)/documents/respostas/$(id));
+    }
+  }
+}
