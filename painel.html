@@ -91,6 +91,7 @@ td.r,th.r{text-align:right}
 /* correção */
 .cq{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
 .cq.certa{border-left:5px solid var(--ok)} .cq.errada{border-left:5px solid var(--bad)} .cq.parcial{border-left:5px solid #B9782A} .cq.anulada{border-left:5px solid var(--muted)}
+.cq p{white-space:pre-line}
 .cq-h{display:flex;justify-content:space-between;gap:10px;font-weight:700;margin-bottom:6px}
 .ca{padding:4px 8px;border-radius:6px;margin:3px 0}
 .ca.correta{background:var(--ok-bg)} .ca.marcada-errada{background:var(--bad-bg)}
@@ -288,7 +289,7 @@ function vProvas(){
       <label class="f">Disciplina<select id="ftD"><option value="">Todas</option>${DISC.filter(d=>turma(d.turmaId)?.ano===ANO&&(!FILTRO.turma||d.turmaId===FILTRO.turma)).map(d=>`<option value="${d.id}" ${FILTRO.disc===d.id?"selected":""}>${esc(d.nome)}</option>`).join("")}</select></label>
     </div>
     <div class="tw"><table><thead><tr><th>Prova</th><th>Turma · Disciplina</th><th>Situação</th><th></th></tr></thead><tbody>
-    ${ps.map(p=>`<tr><td><b>${esc(p.titulo)}</b><br><span class="small muted">${p.questoes?.length||0} questões · ${p.valor||0} pontos</span></td>
+    ${ps.map(p=>`<tr><td><span class="pill">${esc(p.tipoAval||"Prova")}</span> <b>${esc(p.titulo)}</b><br><span class="small muted">${p.questoes?.length||0} questões · ${p.valor||0} pontos</span></td>
       <td>${esc(turma(p.turmaId)?.nome||"")}<br><span class="small muted">${esc(disc(p.disciplinaId)?.nome||"")}</span></td>
       <td><span class="pill ${p.status}">${{rascunho:"Rascunho",aberta:"Aberta",encerrada:"Encerrada"}[p.status]||p.status}</span></td>
       <td class="r" style="white-space:nowrap"><button class="btn sm primary" data-res="${p.id}">Resultados</button> <button class="btn sm" data-ed="${p.id}">Editar</button> <button class="btn sm" data-lk="${p.id}">Copiar link</button></td></tr>`).join("")||'<tr><td colspan="4" class="muted">Nenhuma prova com esses filtros.</td></tr>'}
@@ -330,7 +331,13 @@ function desenharEditor(){
     <div class="row">
       <label class="f" style="flex:3;min-width:240px">Título<input type="text" id="eTit" value="${esc(ED.titulo)}"></label>
       <label class="f" style="flex:2;min-width:220px">Disciplina e turma<select id="eDis"><option value="">Escolha…</option>${ds.map(d=>`<option value="${d.id}" ${ED.disciplinaId===d.id?"selected":""}>${esc(d.nome)} · ${esc(turma(d.turmaId)?.nome)}</option>`).join("")}</select></label>
+      <label class="f" style="width:130px">Tipo<select id="eTipo">${["Prova","Atividade","Avaliação"].map(t=>`<option ${(ED.tipoAval||"Prova")===t?"selected":""}>${t}</option>`).join("")}</select></label>
       <label class="f" style="width:110px">Valor (pontos)<input type="number" id="eVal" min="0" step="0.5" value="${ED.valor??10}"></label>
+      <label class="f" style="width:250px">Anticola (tela cheia)<select id="eVig">
+        <option value="-1" ${!ED.vigiar?"selected":""}>Desligado</option>
+        <option value="0" ${ED.vigiar&&!ED.saidasPermitidas?"selected":""}>Reinicia na 1ª saída</option>
+        <option value="1" ${ED.vigiar&&ED.saidasPermitidas===1?"selected":""}>1 aviso, reinicia na 2ª saída</option>
+        <option value="2" ${ED.vigiar&&ED.saidasPermitidas===2?"selected":""}>2 avisos, reinicia na 3ª saída</option></select></label>
       <label class="f" style="width:170px">Embaralhar alternativas<select id="eEmb"><option value="1" ${ED.embaralhar?"selected":""}>Sim, por aluno</option><option value="0" ${!ED.embaralhar?"selected":""}>Não</option></select></label>
     </div>
     <label class="f" style="margin-top:10px">Instruções para o aluno (opcional)<textarea id="eIns" rows="2">${esc(ED.instrucoes||"")}</textarea></label>
@@ -373,7 +380,7 @@ function qHTML(q,i,falta){
       ${q.imagem?(svgOk(q.imagem)?`<div class="fig"><img src="${svgSrc(q.imagem)}" alt="${esc(altSvg(q.imagem))}"></div>`:'<p class="small" style="color:var(--bad)">Código inválido: precisa começar com &lt;svg e não pode conter scripts.</p>'):""}</details>
     ${corpo}</div>`;
 }
-function lerCabecalho(){ED.titulo=$("#eTit").value.trim();ED.disciplinaId=$("#eDis").value;ED.valor=+$("#eVal").value||0;ED.embaralhar=$("#eEmb").value==="1";ED.instrucoes=$("#eIns").value}
+function lerCabecalho(){ED.tipoAval=$("#eTipo").value;const v=+$("#eVig").value;ED.vigiar=v>=0;ED.saidasPermitidas=Math.max(0,v);ED.titulo=$("#eTit").value.trim();ED.disciplinaId=$("#eDis").value;ED.valor=+$("#eVal").value||0;ED.embaralhar=$("#eEmb").value==="1";ED.instrucoes=$("#eIns").value}
 function ligarEditor(){
   const redesenha=()=>{lerCabecalho();const y=scrollY;desenharEditor();scrollTo(0,y)};
   $$("[data-k]").forEach(el=>el.oninput=()=>{const q=ED.questoes[+el.dataset.q];q[el.dataset.k]=el.dataset.k==="peso"?(+el.value||0):el.value});
@@ -418,6 +425,7 @@ function importarAntiga(txt){
   ED.questoes=vazio?qs:ED.questoes.concat(qs);
   if(!ED.titulo&&tit)ED.titulo=tit.replace(/^Prova:\s*/i,"").trim();
   if(meta.instrucoes&&!ED.instrucoes)ED.instrucoes=meta.instrucoes;
+  if(meta.tipoAval)ED.tipoAval=meta.tipoAval;if(typeof meta.vigiar==="boolean"){ED.vigiar=meta.vigiar;ED.saidasPermitidas=meta.saidasPermitidas||0}
   if(typeof meta.valor==="number")ED.valor=meta.valor;
   const sem=qs.filter(q=>q.tipo==="mc"&&q.correta<0).length;
   desenharEditor();toast(`${qs.length} questões importadas.${sem?` Marque a alternativa correta de ${sem} delas.`:" Gabarito já marcado."}`);
@@ -442,8 +450,8 @@ async function salvarProva(novoStatus){
   const t=turma(d.turmaId),e=escola(t.escolaId);
   ED.questoes.forEach(q=>{if(q.tipo==="mc"){/* remove alternativas vazias mantendo a correta */const map=[];q.alternativas.forEach((a,k)=>{if(a.trim())map.push(k)});if(map.length>=2){q.correta=map.indexOf(q.correta);q.alternativas=map.map(k=>q.alternativas[k])}}});
   const status=novoStatus||ED.status||"rascunho";
-  const fonte={titulo:ED.titulo,instrucoes:ED.instrucoes,valor:ED.valor,embaralhar:ED.embaralhar,disciplinaId:ED.disciplinaId,questoes:ED.questoes};
-  const pub={titulo:ED.titulo,instrucoes:ED.instrucoes||"",valor:ED.valor,embaralhar:ED.embaralhar,status,disciplinaId:d.id,turmaId:t.id,escolaId:e.id,
+  const fonte={tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes,valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,disciplinaId:ED.disciplinaId,questoes:ED.questoes};
+  const pub={tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes||"",valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,status,disciplinaId:d.id,turmaId:t.id,escolaId:e.id,
     disciplinaNome:d.nome,turmaNome:t.nome,escolaNome:e.nome,ano:t.ano,questoes:publico(fonte),atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()};
   const ref=ED.id?db.collection("provas").doc(ED.id):db.collection("provas").doc();
   const batch=db.batch();batch.set(ref,pub);batch.set(db.collection("gabaritos").doc(ref.id),{fonte:JSON.stringify(fonte),gabarito:JSON.stringify(gabaritoDe(fonte))});
@@ -464,7 +472,8 @@ function corrigir(prova,gab,resp){
     tot+=peso;pts+=peso*frac;return {frac,peso,r,g};
   });
   const nota=tot?pts/tot*(Number(prova.valor)||0):0;
-  return {det,nota,acertos:det.filter(d=>d.frac===1).length,pct:tot?pts/tot:0};
+  let oc={log:[],reinicios:0};try{oc={log:[],reinicios:0,...JSON.parse(resp.ocorrencias||"{}")}}catch{}
+  return {det,nota,acertos:det.filter(d=>d.frac===1).length,pct:tot?pts/tot:0,oc};
 }
 let RES=null;
 async function resultados(p){
@@ -492,13 +501,14 @@ function desenharResultados(){
       <div class="kpi"><div class="k">Maior nota</div><div class="v">${notas.length?nf1(Math.max(...notas)):"–"}</div></div>
       <div class="kpi"><div class="k">Menor nota</div><div class="v">${notas.length?nf1(Math.min(...notas)):"–"}</div></div>
     </div>
-    <div class="tw"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado em</th><th class="r">Acertos</th><th class="r">Nota</th><th></th></tr></thead><tbody>
+    <div class="tw"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado em</th><th class="r">Saídas</th><th class="r">Acertos</th><th class="r">Nota</th><th></th></tr></thead><tbody>
     ${linhas.map((l,i)=>`<tr><td>${esc(l.aluno.nome)}<br><span class="small muted">${esc(l.aluno.email)}${l.fora?" · fora da lista da turma":""}</span></td>
       <td>${l.envio?'<span class="pill aberta">Enviou</span>':'<span class="pill">Pendente</span>'}</td>
       <td class="small">${l.envio?esc(fmtData(l.envio.enviadoEm)):""}</td>
+      <td class="r num">${l.envio?(l.c.oc.log.length?`<span style="color:var(--bad);font-weight:700">${l.c.oc.log.length}</span>${l.c.oc.reinicios?`<br><span class="small">${l.c.oc.reinicios} reinício(s)</span>`:""}`:"0"):""}</td>
       <td class="r num">${l.envio?`${l.c.acertos}/${prova.questoes.length}`:""}</td>
       <td class="r num"><b>${l.envio?nf1(l.c.nota):""}</b></td>
-      <td class="r">${l.envio?`<button class="btn sm primary" data-ver="${i}">Ver prova</button>`:""}</td></tr>`).join("")||'<tr><td colspan="6" class="muted">Nenhum aluno na turma.</td></tr>'}
+      <td class="r">${l.envio?`<button class="btn sm primary" data-ver="${i}">Ver prova</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7" class="muted">Nenhum aluno na turma.</td></tr>'}
     </tbody></table></div></section>
   ${env.length?`<section class="panel"><h2 style="margin-bottom:10px">Acerto por questão</h2><div class="qbars">${porQ.map((v,i)=>`<div class="qbar"><span>Q${i+1}</span><span class="t"><span class="${v<0.5?"low":""}" style="width:${v*100}%"></span></span><span class="num r">${Math.round(v*100)}%</span></div>`).join("")}</div><p class="hint" style="margin-top:8px">Questões em vermelho tiveram menos de 50% de acerto: vale revisar o conteúdo ou conferir o gabarito.</p></section>`:""}`;
   $("#rVoltar").onclick=()=>{SUB=null;render()};
@@ -511,7 +521,8 @@ function corrigidaHTML(l){
   const {prova}=RES,c=l.c;
   return `<div class="panel"><h2>${esc(prova.titulo)}</h2>
     <p class="small muted">${esc(prova.escolaNome)} · ${esc(prova.turmaNome)} · ${esc(prova.disciplinaNome)}</p>
-    <p><b>${esc(l.aluno.nome)}</b> · ${esc(l.aluno.email)}<br>Enviado em ${esc(fmtData(l.envio.enviadoEm))} · Acertos: ${c.acertos}/${prova.questoes.length} · <b>Nota: ${nf1(c.nota)} de ${esc(prova.valor)}</b></p></div>
+    <p><b>${esc(l.aluno.nome)}</b> · ${esc(l.aluno.email)}<br>Enviado em ${esc(fmtData(l.envio.enviadoEm))} · Acertos: ${c.acertos}/${prova.questoes.length} · <b>Nota: ${nf1(c.nota)} de ${esc(prova.valor)}</b></p>
+    ${c.oc.log.length?`<div class="alert bad" style="margin-bottom:0"><b>Saídas da prova: ${c.oc.log.length}${c.oc.reinicios?` · reiniciou ${c.oc.reinicios} vez(es)`:""}</b><br>${c.oc.log.map(o=>`${new Date(o.t).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"medium"})}: ${esc(o.tipo)}`).join("<br>")}</div>`:(prova.vigiar?'<p class="small muted" style="margin:0">Nenhuma saída da tela registrada.</p>':"")}</div>
     ${prova.questoes.map((q,i)=>{const d=c.det[i],cls=q.anulada?"anulada":d.frac===1?"certa":d.frac===0?"errada":"parcial";
       let corpo="";
       if(q.tipo==="mc")corpo=q.alternativas.map((a,k)=>`<div class="ca ${k===d.g?"correta":k===d.r?"marcada-errada":""}">${LETRAS[k]}) ${rico(a)} ${k===d.r?"<b>← marcada</b>":""}${k===d.g?" <b>✓ correta</b>":""}</div>`).join("")+(d.r<0||d.r==null?'<div class="ca marcada-errada">Sem resposta</div>':"");
@@ -544,8 +555,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#show").hidden)
 /* ================= EXPORTAÇÕES ================= */
 function exportarNotas(){
   const {prova,linhas}=RES;
-  const head=["Aluno","E-mail","Situação","Enviado em",...prova.questoes.map((_,i)=>`Q${i+1}`),"Acertos","Nota"];
-  const rows=linhas.map(l=>[l.aluno.nome,l.aluno.email,l.envio?"Enviou":"Pendente",l.envio?fmtData(l.envio.enviadoEm):"",...prova.questoes.map((_,i)=>l.envio?Math.round(l.c.det[i].frac*100)/100:""),l.envio?l.c.acertos:"",l.envio?Math.round(l.c.nota*100)/100:""]);
+  const head=["Aluno","E-mail","Situação","Enviado em",...prova.questoes.map((_,i)=>`Q${i+1}`),"Saídas","Reinícios","Acertos","Nota"];
+  const rows=linhas.map(l=>[l.aluno.nome,l.aluno.email,l.envio?"Enviou":"Pendente",l.envio?fmtData(l.envio.enviadoEm):"",...prova.questoes.map((_,i)=>l.envio?Math.round(l.c.det[i].frac*100)/100:""),l.envio?l.c.oc.log.length:"",l.envio?l.c.oc.reinicios:"",l.envio?l.c.acertos:"",l.envio?Math.round(l.c.nota*100)/100:""]);
   const ws=XLSX.utils.aoa_to_sheet([[`${prova.titulo} · ${prova.turmaNome} · ${prova.disciplinaNome}`],[],head,...rows]);
   ws["!cols"]=[{wch:32},{wch:34},{wch:10},{wch:16},...prova.questoes.map(()=>({wch:6})),{wch:9},{wch:8}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Notas");
@@ -566,7 +577,8 @@ async function pdfProvas(lista,nome){
     if(n>0)doc.addPage();y=50;
     txt(prova.titulo,{size:15,bold:true});txt(`${prova.escolaNome} · ${prova.turmaNome} · ${prova.disciplinaNome}`,{size:9,cor:[91,102,114]});y+=4;
     txt(`Aluno: ${l.aluno.nome} (${l.aluno.email})`,{bold:true});
-    txt(`Enviado em ${fmtData(l.envio.enviadoEm)} · Acertos: ${l.c.acertos}/${prova.questoes.length} · Nota: ${nf1(l.c.nota)} de ${prova.valor}`);y+=8;
+    txt(`Enviado em ${fmtData(l.envio.enviadoEm)} · Acertos: ${l.c.acertos}/${prova.questoes.length} · Nota: ${nf1(l.c.nota)} de ${prova.valor}`);
+    if(prova.vigiar||l.c.oc.log.length)txt(`Saídas da tela registradas: ${l.c.oc.log.length}${l.c.oc.reinicios?` (reiniciou ${l.c.oc.reinicios} vez(es))`:""}`,{cor:l.c.oc.log.length?[166,58,50]:[91,102,114]});y+=8;
     prova.questoes.forEach((q,i)=>{
       const d=l.c.det[i],sit=q.anulada?"ANULADA":d.frac===1?"CERTA":d.frac===0?"ERRADA":`PARCIAL (${Math.round(d.frac*100)}%)`;
       if(y>H-90){doc.addPage();y=50}
