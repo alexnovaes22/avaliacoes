@@ -111,7 +111,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const LETRAS="ABCDEFGH";
 const params=new URLSearchParams(location.search);
 const PROVA_ID=(params.get("p")||"").replace(/[^A-Za-z0-9]/g,"");
-let auth,db,USER=null,PROVA=null,ST=null,TELA=0,ORDEM=null,PREVIEW=false;
+let auth,db,USER=null,PROVA=null,ST=null,TELA=0,ORDEM=null,QORD=null,PREVIEW=false,LOGIN_MSG="";
 
 function svgNorm(svg){let s=String(svg||"").trim();const head=(s.match(/^<svg[^>]*>/i)||[""])[0];let h=head;
   if(!/xmlns=/.test(h))h=h.replace(/^<svg/i,'<svg xmlns="http://www.w3.org/2000/svg"');
@@ -138,6 +138,7 @@ function dialogo(t,corpo,botoes){
 
 /* ---------- embaralhamento determinístico por aluno ---------- */
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function qordem(seed){const R=rng(seed^0x5bd1e995),a=[...PROVA.questoes.keys()];if(PROVA.embaralharQuestoes)for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function ordem(seed){const R=rng(seed);return PROVA.questoes.map(q=>{const n=q.tipo==="mc"?q.alternativas.length:0;const a=[...Array(n).keys()];if(PROVA.embaralhar)for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a})}
 
 /* ---------- rascunho local ---------- */
@@ -165,8 +166,10 @@ function violacao(tipo){
 }
 function reiniciar(){
   const log=ST.log,rein=(ST.reinicios||0)+1;
-  ST=novoEstado();ST.log=log;ST.reinicios=rein;ORDEM=ordem(ST.seed);TELA=0;salvar();
-  sairTelaCheia();pausado=false;MSG_REINICIO=true;mostrar(0);
+  ST=novoEstado();ST.log=log;ST.reinicios=rein;ST.avisoReinicio=true;TELA=0;salvar();
+  sairTelaCheia();pausado=false;pararRelogio();
+  LOGIN_MSG=`Você saiu da tela durante a ${tl()}. Ela foi encerrada e suas respostas foram apagadas. Entre de novo para recomeçar do início.`;
+  PROVA=null;ST=null;sair();
 }
 function telaAviso(){
   const resta=(PROVA.saidasPermitidas||0)-ST.saidas;
@@ -174,7 +177,7 @@ function telaAviso(){
   tela(`<div class="card center"><div class="big-ok" aria-hidden="true" style="color:var(--bad)">!</div>
     <h1>Você saiu da ${tl()}</h1>
     <p>Sair da tela cheia, trocar de aba ou abrir outra janela não é permitido.</p>
-    <p class="alert"><b>${resta===0?"Este foi o último aviso.":`Restam ${resta} aviso(s).`}</b> Na próxima saída, suas respostas serão apagadas e a ${tl()} recomeça do início.</p>
+    <p class="alert"><b>${resta===0?"Este foi o último aviso.":`Restam ${resta} aviso(s).`}</b> Na próxima saída, a ${tl()} será encerrada, suas respostas serão apagadas e você terá que entrar de novo e recomeçar do zero.</p>
     <p><button class="btn primary" id="bVoltarProva">Voltar à ${tl()}</button></p></div>`);
   $("#bVoltarProva").onclick=async()=>{await entrarTelaCheia();pausado=false;mostrar(TELA||1)};
 }
@@ -191,7 +194,7 @@ async function iniciar(){
   if(!PROVA_ID){tela(`<div class="card"><h1>Link incompleto</h1><p>Abra a prova pelo link enviado pelo professor.</p></div>`);return}
   auth.onAuthStateChanged(u=>{USER=u;u?abrir():telaLogin()});
 }
-function telaLogin(msg){
+function telaLogin(msg){msg=msg||LOGIN_MSG;LOGIN_MSG="";
   tela(`<div class="card center">
     <h1>Avaliação</h1>
     <p>Entre com a sua conta Google da escola para começar.</p>
@@ -234,7 +237,8 @@ async function abrir(){
       <p><button class="btn" id="bSair">Sair da conta</button></p></div>`);
     $("#bSair").onclick=sair;return;
   }
-  ST=carregar();ORDEM=ordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
+  ST=carregar();ORDEM=ordem(ST.seed);QORD=qordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
+  if(ST.avisoReinicio){MSG_REINICIO=true;ST.avisoReinicio=false;TELA=0;salvar()}
   iniciarRelogio();
   document.title=PROVA.titulo;
   if(PROVA.vigiar&&ST.emAndamento){violacao("fechou ou recarregou a página");return}
@@ -267,27 +271,27 @@ function mostrar(i){
       ${PROVA.instrucoes?`<p style="white-space:pre-line">${esc(PROVA.instrucoes)}</p>`:""}
       <p>São ${N()} questões. Suas respostas ficam salvas neste navegador enquanto você responde.</p>
       <p><b>Você só pode enviar uma vez.</b> Depois do envio, não é possível alterar as respostas.</p>
-      ${PROVA.vigiar?`<div class="alert"><b>${tu()} em tela cheia.</b> Ao clicar em Começar, a ${tl()} ocupa a tela toda. Sair da tela cheia, trocar de aba, abrir outra janela ou fechar a página ${PROVA.saidasPermitidas?`gera um aviso. Depois de ${PROVA.saidasPermitidas} aviso(s), suas respostas são apagadas e a ${tl()} recomeça.`:`<b>apaga suas respostas</b> e a ${tl()} recomeça do início.`}</div>`:""}</section>`;
+      ${PROVA.vigiar?`<div class="alert"><b>${tu()} em tela cheia.</b> Ao clicar em Começar, a ${tl()} ocupa a tela toda. Sair da tela cheia, trocar de aba, abrir outra janela ou fechar a página ${PROVA.saidasPermitidas?`gera um aviso. Depois de ${PROVA.saidasPermitidas} aviso(s), a ${tl()} é encerrada, suas respostas são apagadas e você volta para a tela de login para recomeçar do zero.`:`<b>encerra a ${tl()}</b>: suas respostas são apagadas e você volta para a tela de login para recomeçar do zero.`}</div>`:""}</section>`;
     if(MSG_REINICIO){corpo=`<div class="alert" style="border-color:var(--bad)"><b>A ${tl()} foi reiniciada</b> porque você saiu da tela. Suas respostas anteriores foram apagadas.</div>`+corpo;MSG_REINICIO=false}
   }else if(TELA===ULT()){
     const faltam=PROVA.questoes.map((_,k)=>k).filter(k=>!respondida(k));
     corpo=`<section class="card"><h2>Revisão</h2>
       <p>${faltam.length?`Faltam <b>${faltam.length}</b> questão(ões) sem resposta completa.`:"Todas as questões estão respondidas."}</p>
-      <ol class="rev-list">${PROVA.questoes.map((q,k)=>`<li><button class="btn" style="padding:2px 10px" data-ir="${k+1}">Questão ${k+1}</button> ${respondida(k)?"respondida":'<span class="vazia">incompleta</span>'}</li>`).join("")}</ol>
+      <ol class="rev-list">${PROVA.questoes.map((q,k)=>`<li><button class="btn" style="padding:2px 10px" data-ir="${k+1}">Questão ${k+1}</button> ${respondida(QORD[k])?"respondida":'<span class="vazia">incompleta</span>'}</li>`).join("")}</ol>
       <div class="acts" style="justify-content:flex-start"><button class="btn primary" id="bEnviar" ${PREVIEW?"disabled":""}>Enviar ${tl()}</button>${PREVIEW?'<button class="btn" id="bFimTeste">Encerrar teste</button>':""}</div></section>`;
   }else corpo=`<section class="card" id="qcard"></section>`;
   tela(cabecalho()+corpo);
   $("#bSair").onclick=async()=>{const r=await dialogo("Sair?",`<p>Suas respostas continuam salvas neste navegador, mas a ${tl()} <b>não foi enviada</b>.</p>`,[[`Continuar a ${tl()}`,0],["Sair",1,"primary"]]);if(r)sair()};
-  if(TELA>0&&TELA<ULT())questao(TELA-1);
+  if(TELA>0&&TELA<ULT())questao(QORD[TELA-1],TELA);
   document.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>mostrar(+b.dataset.ir));
-  $("#bEnviar")?.addEventListener("click",enviar);
+  $("#bEnviar")?.addEventListener("click",()=>enviar(false));
   $("#bFimTeste")?.addEventListener("click",()=>{pausado=true;ST.emAndamento=false;localStorage.removeItem(chave());sairTelaCheia();tela(`<div class="card center"><h1>Teste encerrado</h1><p>Nada foi enviado. As respostas do teste foram apagadas deste navegador.</p><p><button class="btn" onclick="location.reload()">Testar de novo</button></p></div>`)});
   montarNav();barra();window.scrollTo({top:0});
 }
-function questao(qi){
+function questao(qi,pos){
   const q=PROVA.questoes[qi],box=$("#qcard");
   const head=document.createElement("div");head.className="qhead";
-  head.innerHTML=`<span class="qnum">${qi+1}</span><span class="topic"></span>`;head.querySelector(".topic").textContent=q.topico||"";
+  head.innerHTML=`<span class="qnum">${pos}</span><span class="topic"></span>`;head.querySelector(".topic").textContent=q.topico||"";
   box.appendChild(head);
   const stem=document.createElement("p");stem.className="stem";stem.id="st"+qi;box.appendChild(stem);
   if(q.tipo==="lacuna"){
@@ -324,7 +328,7 @@ function montarNav(){
   const nav=$("#nav");if(!nav)return;nav.innerHTML="";
   const mk=(txt,i,feita,label)=>{const b=document.createElement("button");b.textContent=txt;if(feita)b.className="feita";if(TELA===i)b.setAttribute("aria-current","step");b.setAttribute("aria-label",label);b.onclick=()=>mostrar(i);nav.appendChild(b)};
   mk("Início",0,false,"Início");
-  PROVA.questoes.forEach((_,k)=>mk(String(k+1),k+1,respondida(k),`Questão ${k+1}${respondida(k)?", respondida":", sem resposta"}`));
+  PROVA.questoes.forEach((_,k)=>{const r=respondida(QORD[k]);mk(String(k+1),k+1,r,`Questão ${k+1}${r?", respondida":", sem resposta"}`)});
   mk("Revisão",ULT(),false,"Revisão e envio");
 }
 function barra(){
@@ -376,7 +380,7 @@ async function enviar(auto){
     dialogo("Não foi enviado",`<p>${msg}</p>`,[["Entendi",0,"primary"]]);
   }
 }
-window.addEventListener("beforeunload",e=>{if(PROVA&&ST&&!PREVIEW&&document.querySelector(".nav")){e.preventDefault();e.returnValue=""}});
+window.addEventListener("beforeunload",e=>{if(PROVA&&ST&&!PREVIEW&&!LOGIN_MSG&&document.querySelector(".nav")){e.preventDefault();e.returnValue=""}});
 iniciar();
 </script>
 </body>

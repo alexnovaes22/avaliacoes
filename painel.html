@@ -356,7 +356,7 @@ function desenharEditor(){
         <option value="0" ${ED.vigiar&&!ED.saidasPermitidas?"selected":""}>Reinicia na 1ª saída</option>
         <option value="1" ${ED.vigiar&&ED.saidasPermitidas===1?"selected":""}>1 aviso, reinicia na 2ª saída</option>
         <option value="2" ${ED.vigiar&&ED.saidasPermitidas===2?"selected":""}>2 avisos, reinicia na 3ª saída</option></select></label>
-      <label class="f" style="width:170px">Embaralhar alternativas<select id="eEmb"><option value="1" ${ED.embaralhar?"selected":""}>Sim, por aluno</option><option value="0" ${!ED.embaralhar?"selected":""}>Não</option></select></label>
+      <label class="f" style="width:230px">Embaralhar (por aluno)<select id="eEmb"><option value="2" ${ED.embaralhar&&ED.embaralharQuestoes?"selected":""}>Questões e alternativas</option><option value="1" ${ED.embaralhar&&!ED.embaralharQuestoes?"selected":""}>Só as alternativas</option><option value="0" ${!ED.embaralhar?"selected":""}>Não embaralhar</option></select></label>
     </div>
     <label class="f" style="margin-top:10px">Instruções para o aluno (opcional)<textarea id="eIns" rows="2">${esc(ED.instrucoes||"")}</textarea></label>
     ${ED.status!=="rascunho"?`<div class="alert">Esta prova já foi ${ED.status==="aberta"?"aberta":"encerrada"}. Corrigir gabarito ou anular questões recalcula as notas de todos. Evite mudar enunciados e alternativas depois que alunos já enviaram.</div>`:""}
@@ -398,7 +398,7 @@ function qHTML(q,i,falta){
       ${q.imagem?(svgOk(q.imagem)?`<div class="fig"><img src="${svgSrc(q.imagem)}" alt="${esc(altSvg(q.imagem))}"></div>`:'<p class="small" style="color:var(--bad)">Código inválido: precisa começar com &lt;svg e não pode conter scripts.</p>'):""}</details>
     ${corpo}</div>`;
 }
-function lerCabecalho(){ED.duracaoMin=Math.max(0,Math.round(+$("#eDur").value||0));ED.bloquearCelular=$("#eCel").value==="1";ED.tipoAval=$("#eTipo").value;const v=+$("#eVig").value;ED.vigiar=v>=0;ED.saidasPermitidas=Math.max(0,v);ED.titulo=$("#eTit").value.trim();ED.disciplinaId=$("#eDis").value;ED.valor=+$("#eVal").value||0;ED.embaralhar=$("#eEmb").value==="1";ED.instrucoes=$("#eIns").value}
+function lerCabecalho(){ED.duracaoMin=Math.max(0,Math.round(+$("#eDur").value||0));ED.bloquearCelular=$("#eCel").value==="1";ED.tipoAval=$("#eTipo").value;const v=+$("#eVig").value;ED.vigiar=v>=0;ED.saidasPermitidas=Math.max(0,v);ED.titulo=$("#eTit").value.trim();ED.disciplinaId=$("#eDis").value;ED.valor=+$("#eVal").value||0;ED.embaralhar=$("#eEmb").value!=="0";ED.embaralharQuestoes=$("#eEmb").value==="2";ED.instrucoes=$("#eIns").value}
 function ligarEditor(){
   const redesenha=()=>{lerCabecalho();const y=scrollY;desenharEditor();scrollTo(0,y)};
   $$("[data-k]").forEach(el=>el.oninput=()=>{const q=ED.questoes[+el.dataset.q];q[el.dataset.k]=el.dataset.k==="peso"?(+el.value||0):el.value});
@@ -443,7 +443,7 @@ function importarAntiga(txt){
   ED.questoes=vazio?qs:ED.questoes.concat(qs);
   if(!ED.titulo&&tit)ED.titulo=tit.replace(/^Prova:\s*/i,"").trim();
   if(meta.instrucoes&&!ED.instrucoes)ED.instrucoes=meta.instrucoes;
-  if(meta.tipoAval)ED.tipoAval=meta.tipoAval;if(typeof meta.duracaoMin==="number")ED.duracaoMin=meta.duracaoMin;if(typeof meta.bloquearCelular==="boolean")ED.bloquearCelular=meta.bloquearCelular;if(typeof meta.vigiar==="boolean"){ED.vigiar=meta.vigiar;ED.saidasPermitidas=meta.saidasPermitidas||0}
+  if(meta.tipoAval)ED.tipoAval=meta.tipoAval;if(typeof meta.duracaoMin==="number")ED.duracaoMin=meta.duracaoMin;if(typeof meta.embaralharQuestoes==="boolean")ED.embaralharQuestoes=meta.embaralharQuestoes;if(typeof meta.embaralhar==="boolean")ED.embaralhar=meta.embaralhar;if(typeof meta.bloquearCelular==="boolean")ED.bloquearCelular=meta.bloquearCelular;if(typeof meta.vigiar==="boolean"){ED.vigiar=meta.vigiar;ED.saidasPermitidas=meta.saidasPermitidas||0}
   if(typeof meta.valor==="number")ED.valor=meta.valor;
   const sem=qs.filter(q=>q.tipo==="mc"&&q.correta<0).length;
   desenharEditor();toast(`${qs.length} questões importadas.${sem?` Marque a alternativa correta de ${sem} delas.`:" Gabarito já marcado."}`);
@@ -468,8 +468,8 @@ async function salvarProva(novoStatus){
   const t=turma(d.turmaId),e=escola(t.escolaId);
   ED.questoes.forEach(q=>{if(q.tipo==="mc"){/* remove alternativas vazias mantendo a correta */const map=[];q.alternativas.forEach((a,k)=>{if(a.trim())map.push(k)});if(map.length>=2){q.correta=map.indexOf(q.correta);q.alternativas=map.map(k=>q.alternativas[k])}}});
   const status=novoStatus||ED.status||"rascunho";
-  const fonte={duracaoMin:ED.duracaoMin??50,bloquearCelular:ED.bloquearCelular!==false,tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes,valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,disciplinaId:ED.disciplinaId,questoes:ED.questoes};
-  const pub={duracaoMin:ED.duracaoMin??50,bloquearCelular:ED.bloquearCelular!==false,tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes||"",valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,status,disciplinaId:d.id,turmaId:t.id,escolaId:e.id,
+  const fonte={embaralharQuestoes:!!ED.embaralharQuestoes,duracaoMin:ED.duracaoMin??50,bloquearCelular:ED.bloquearCelular!==false,tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes,valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,disciplinaId:ED.disciplinaId,questoes:ED.questoes};
+  const pub={embaralharQuestoes:!!ED.embaralharQuestoes,duracaoMin:ED.duracaoMin??50,bloquearCelular:ED.bloquearCelular!==false,tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes||"",valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,status,disciplinaId:d.id,turmaId:t.id,escolaId:e.id,
     disciplinaNome:d.nome,turmaNome:t.nome,escolaNome:e.nome,ano:t.ano,questoes:publico(fonte),atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()};
   if(status==="aberta"){
     const atual=PROVAS.find(p=>p.id===ED.id);
