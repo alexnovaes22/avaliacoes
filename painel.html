@@ -162,6 +162,11 @@ firebase.initializeApp(FIREBASE_CONFIG);
 const auth=firebase.auth(), db=firebase.firestore();
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
 let ESCOLAS=[],TURMAS=[],DISC=[],PROVAS=[],ANO=new Date().getFullYear(),VIEW="provas",SUB=null;
+const TSV=firebase.firestore.Timestamp, FV=firebase.firestore.FieldValue;
+const msDe=t=>t?(t.toMillis?t.toMillis():(t.seconds||0)*1000):0;
+const hhmm=ms=>new Date(ms).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+function efStatus(p){if(p.status==="aberta"&&p.fechaEm&&msDe(p.fechaEm)<=Date.now())return "encerrada";return p.status}
+function janela(dur){return dur>0?{abertaEm:FV.serverTimestamp(),fechaEm:TSV.fromMillis(Date.now()+dur*60000)}:{abertaEm:FV.serverTimestamp(),fechaEm:FV.delete()}}
 const ehProf=u=>u&&(u.email||"").toLowerCase()===String(PROFESSOR_EMAIL).toLowerCase();
 
 $("#bLogin").onclick=async()=>{
@@ -189,6 +194,7 @@ async function carregarTudo(){
   const anos=[...new Set([new Date().getFullYear(),...TURMAS.map(t=>t.ano)])].sort((a,b)=>b-a);
   $("#anoSel").innerHTML=anos.map(a=>`<option ${a===ANO?"selected":""}>${a}</option>`).join("");
 }
+setInterval(()=>{if(auth.currentUser&&VIEW==="provas"&&!SUB&&!document.hidden)render()},30000);
 $("#anoSel").onchange=e=>{ANO=+e.target.value;SUB=null;render()};
 $$(".tabs button").forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;SUB=null;render()});
 const escola=id=>ESCOLAS.find(x=>x.id===id), turma=id=>TURMAS.find(x=>x.id===id), disc=id=>DISC.find(x=>x.id===id);
@@ -291,7 +297,10 @@ function vProvas(){
     <div class="tw"><table><thead><tr><th>Prova</th><th>Turma · Disciplina</th><th>Situação</th><th></th></tr></thead><tbody>
     ${ps.map(p=>`<tr><td><span class="pill">${esc(p.tipoAval||"Prova")}</span> <b>${esc(p.titulo)}</b><br><span class="small muted">${p.questoes?.length||0} questões · ${p.valor||0} pontos</span></td>
       <td>${esc(turma(p.turmaId)?.nome||"")}<br><span class="small muted">${esc(disc(p.disciplinaId)?.nome||"")}</span></td>
-      <td><span class="pill ${p.status}">${{rascunho:"Rascunho",aberta:"Aberta",encerrada:"Encerrada"}[p.status]||p.status}</span></td>
+      <td>${(()=>{const ef=efStatus(p),fe=msDe(p.fechaEm);
+        if(ef==="aberta")return `<span class="pill aberta">Aberta</span>${fe?` <span class="small">até ${hhmm(fe)} (${Math.max(0,Math.ceil((fe-Date.now())/60000))} min)</span> <button class="btn sm" data-mais="${p.id}">+10 min</button>`:""} <button class="btn sm" data-enc="${p.id}">Encerrar</button>`;
+        if(ef==="encerrada")return `<span class="pill encerrada">Encerrada</span>${p.status==="aberta"&&fe?` <span class="small">sozinha às ${hhmm(fe)}</span>`:""} <button class="btn sm" data-reab="${p.id}">Reabrir${(p.duracaoMin??50)>0?` (${p.duracaoMin??50} min)`:""}</button>`;
+        return `<span class="pill rascunho">Rascunho</span>`})()}<div class="small muted">${p.bloquearCelular?"Só computador":"Celular liberado"}${p.vigiar?" · anticola":""}</div></td>
       <td class="r" style="white-space:nowrap"><button class="btn sm primary" data-res="${p.id}">Resultados</button> <button class="btn sm" data-ed="${p.id}">Editar</button> <button class="btn sm" data-lk="${p.id}">Copiar link</button></td></tr>`).join("")||'<tr><td colspan="4" class="muted">Nenhuma prova com esses filtros.</td></tr>'}
     </tbody></table></div>
   </section>`;
@@ -302,6 +311,13 @@ function vProvas(){
   $$("[data-ed]").forEach(b=>b.onclick=()=>editor(PROVAS.find(p=>p.id===b.dataset.ed)));
   $$("[data-res]").forEach(b=>b.onclick=()=>resultados(PROVAS.find(p=>p.id===b.dataset.res)));
   $$("[data-lk]").forEach(b=>b.onclick=()=>copiar(linkProva(b.dataset.lk)));
+  const mudaStatus=async(id,st)=>{const p=PROVAS.find(x=>x.id===id),dur=p.duracaoMin??50;
+    await db.collection("provas").doc(id).update(st==="aberta"?{status:"aberta",...janela(dur)}:{status:"encerrada",fechaEm:FV.delete()});
+    await carregarTudo();render();toast(st==="aberta"?(dur>0?`Reaberta por ${dur} minutos`:"Prova reaberta"):"Prova encerrada: novos acessos e envios bloqueados")};
+  $$("[data-mais]").forEach(b=>b.onclick=async()=>{const p=PROVAS.find(x=>x.id===b.dataset.mais),base=Math.max(Date.now(),msDe(p.fechaEm));
+    await db.collection("provas").doc(p.id).update({fechaEm:TSV.fromMillis(base+10*60000)});await carregarTudo();render();toast(`Prorrogada até ${hhmm(base+10*60000)}`)});
+  $$("[data-enc]").forEach(b=>b.onclick=()=>{if(confirm("Encerrar agora? Alunos que ainda não enviaram não conseguirão mais enviar."))mudaStatus(b.dataset.enc,"encerrada")});
+  $$("[data-reab]").forEach(b=>b.onclick=()=>mudaStatus(b.dataset.reab,"aberta"));
 }
 async function copiar(t){try{await navigator.clipboard.writeText(t);toast("Link copiado")}catch{prompt("Copie o link:",t)}}
 
@@ -333,6 +349,8 @@ function desenharEditor(){
       <label class="f" style="flex:2;min-width:220px">Disciplina e turma<select id="eDis"><option value="">Escolha…</option>${ds.map(d=>`<option value="${d.id}" ${ED.disciplinaId===d.id?"selected":""}>${esc(d.nome)} · ${esc(turma(d.turmaId)?.nome)}</option>`).join("")}</select></label>
       <label class="f" style="width:130px">Tipo<select id="eTipo">${["Prova","Atividade","Avaliação"].map(t=>`<option ${(ED.tipoAval||"Prova")===t?"selected":""}>${t}</option>`).join("")}</select></label>
       <label class="f" style="width:110px">Valor (pontos)<input type="number" id="eVal" min="0" step="0.5" value="${ED.valor??10}"></label>
+      <label class="f" style="width:170px">Fechar sozinha após (min)<input type="number" id="eDur" min="0" step="5" value="${ED.duracaoMin??50}" title="0 = não fecha sozinha"></label>
+      <label class="f" style="width:210px">Dispositivos<select id="eCel"><option value="1" ${ED.bloquearCelular!==false?"selected":""}>Somente computador</option><option value="0" ${ED.bloquearCelular===false?"selected":""}>Computador e celular</option></select></label>
       <label class="f" style="width:250px">Anticola (tela cheia)<select id="eVig">
         <option value="-1" ${!ED.vigiar?"selected":""}>Desligado</option>
         <option value="0" ${ED.vigiar&&!ED.saidasPermitidas?"selected":""}>Reinicia na 1ª saída</option>
@@ -380,7 +398,7 @@ function qHTML(q,i,falta){
       ${q.imagem?(svgOk(q.imagem)?`<div class="fig"><img src="${svgSrc(q.imagem)}" alt="${esc(altSvg(q.imagem))}"></div>`:'<p class="small" style="color:var(--bad)">Código inválido: precisa começar com &lt;svg e não pode conter scripts.</p>'):""}</details>
     ${corpo}</div>`;
 }
-function lerCabecalho(){ED.tipoAval=$("#eTipo").value;const v=+$("#eVig").value;ED.vigiar=v>=0;ED.saidasPermitidas=Math.max(0,v);ED.titulo=$("#eTit").value.trim();ED.disciplinaId=$("#eDis").value;ED.valor=+$("#eVal").value||0;ED.embaralhar=$("#eEmb").value==="1";ED.instrucoes=$("#eIns").value}
+function lerCabecalho(){ED.duracaoMin=Math.max(0,Math.round(+$("#eDur").value||0));ED.bloquearCelular=$("#eCel").value==="1";ED.tipoAval=$("#eTipo").value;const v=+$("#eVig").value;ED.vigiar=v>=0;ED.saidasPermitidas=Math.max(0,v);ED.titulo=$("#eTit").value.trim();ED.disciplinaId=$("#eDis").value;ED.valor=+$("#eVal").value||0;ED.embaralhar=$("#eEmb").value==="1";ED.instrucoes=$("#eIns").value}
 function ligarEditor(){
   const redesenha=()=>{lerCabecalho();const y=scrollY;desenharEditor();scrollTo(0,y)};
   $$("[data-k]").forEach(el=>el.oninput=()=>{const q=ED.questoes[+el.dataset.q];q[el.dataset.k]=el.dataset.k==="peso"?(+el.value||0):el.value});
@@ -425,7 +443,7 @@ function importarAntiga(txt){
   ED.questoes=vazio?qs:ED.questoes.concat(qs);
   if(!ED.titulo&&tit)ED.titulo=tit.replace(/^Prova:\s*/i,"").trim();
   if(meta.instrucoes&&!ED.instrucoes)ED.instrucoes=meta.instrucoes;
-  if(meta.tipoAval)ED.tipoAval=meta.tipoAval;if(typeof meta.vigiar==="boolean"){ED.vigiar=meta.vigiar;ED.saidasPermitidas=meta.saidasPermitidas||0}
+  if(meta.tipoAval)ED.tipoAval=meta.tipoAval;if(typeof meta.duracaoMin==="number")ED.duracaoMin=meta.duracaoMin;if(typeof meta.bloquearCelular==="boolean")ED.bloquearCelular=meta.bloquearCelular;if(typeof meta.vigiar==="boolean"){ED.vigiar=meta.vigiar;ED.saidasPermitidas=meta.saidasPermitidas||0}
   if(typeof meta.valor==="number")ED.valor=meta.valor;
   const sem=qs.filter(q=>q.tipo==="mc"&&q.correta<0).length;
   desenharEditor();toast(`${qs.length} questões importadas.${sem?` Marque a alternativa correta de ${sem} delas.`:" Gabarito já marcado."}`);
@@ -450,14 +468,19 @@ async function salvarProva(novoStatus){
   const t=turma(d.turmaId),e=escola(t.escolaId);
   ED.questoes.forEach(q=>{if(q.tipo==="mc"){/* remove alternativas vazias mantendo a correta */const map=[];q.alternativas.forEach((a,k)=>{if(a.trim())map.push(k)});if(map.length>=2){q.correta=map.indexOf(q.correta);q.alternativas=map.map(k=>q.alternativas[k])}}});
   const status=novoStatus||ED.status||"rascunho";
-  const fonte={tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes,valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,disciplinaId:ED.disciplinaId,questoes:ED.questoes};
-  const pub={tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes||"",valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,status,disciplinaId:d.id,turmaId:t.id,escolaId:e.id,
+  const fonte={duracaoMin:ED.duracaoMin??50,bloquearCelular:ED.bloquearCelular!==false,tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes,valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,disciplinaId:ED.disciplinaId,questoes:ED.questoes};
+  const pub={duracaoMin:ED.duracaoMin??50,bloquearCelular:ED.bloquearCelular!==false,tipoAval:ED.tipoAval||"Prova",titulo:ED.titulo,instrucoes:ED.instrucoes||"",valor:ED.valor,embaralhar:ED.embaralhar,vigiar:!!ED.vigiar,saidasPermitidas:ED.saidasPermitidas||0,status,disciplinaId:d.id,turmaId:t.id,escolaId:e.id,
     disciplinaNome:d.nome,turmaNome:t.nome,escolaNome:e.nome,ano:t.ano,questoes:publico(fonte),atualizadoEm:firebase.firestore.FieldValue.serverTimestamp()};
+  if(status==="aberta"){
+    const atual=PROVAS.find(p=>p.id===ED.id);
+    if(novoStatus==="aberta"||!atual||!atual.abertaEm){const dur=pub.duracaoMin;pub.abertaEm=FV.serverTimestamp();if(dur>0)pub.fechaEm=TSV.fromMillis(Date.now()+dur*60000)}
+    else{pub.abertaEm=atual.abertaEm;if(atual.fechaEm)pub.fechaEm=atual.fechaEm}
+  }
   const ref=ED.id?db.collection("provas").doc(ED.id):db.collection("provas").doc();
   const batch=db.batch();batch.set(ref,pub);batch.set(db.collection("gabaritos").doc(ref.id),{fonte:JSON.stringify(fonte),gabarito:JSON.stringify(gabaritoDe(fonte))});
   try{await batch.commit()}catch(err){alert("Não consegui salvar: "+(err.code||err.message));return}
   ED.id=ref.id;ED.status=status;await carregarTudo();desenharEditor();
-  toast(novoStatus==="aberta"?"Prova aberta. Copie o link e poste no Classroom.":novoStatus==="encerrada"?"Prova encerrada: novos envios estão bloqueados.":"Prova salva");
+  toast(novoStatus==="aberta"?(pub.fechaEm?`Aberta até ${hhmm(pub.fechaEm.toMillis())}. Copie o link e poste no Classroom.`:"Prova aberta. Copie o link e poste no Classroom."):novoStatus==="encerrada"?"Prova encerrada: novos envios estão bloqueados.":"Prova salva");
 }
 
 /* ================= CORREÇÃO ================= */
@@ -493,7 +516,7 @@ function desenharResultados(){
   const porQ=prova.questoes.map((q,i)=>env.length?env.reduce((a,l)=>a+l.c.det[i].frac,0)/env.length:0);
   $("#view").innerHTML=`
   <div class="row noprint" style="margin-bottom:12px"><button class="btn" id="rVoltar">← Provas</button></div>
-  <section class="panel"><div class="panel-h"><div><h2>${esc(prova.titulo)}</h2><p class="small muted">${esc(prova.escolaNome)} · ${esc(prova.turmaNome)} · ${esc(prova.disciplinaNome)} · valor ${esc(prova.valor)} · <span class="pill ${prova.status}">${prova.status}</span></p></div>
+  <section class="panel"><div class="panel-h"><div><h2>${esc(prova.titulo)}</h2><p class="small muted">${esc(prova.escolaNome)} · ${esc(prova.turmaNome)} · ${esc(prova.disciplinaNome)} · valor ${esc(prova.valor)} · <span class="pill ${efStatus(prova)}">${efStatus(prova)}</span></p></div>
     <div class="row"><button class="btn" id="rXls">Notas em Excel</button><button class="btn" id="rPdfAll" ${env.length?"":"disabled"}>PDF de todas as provas</button><button class="btn" id="rAtual">Atualizar</button></div></div>
     <div class="kpis">
       <div class="kpi"><div class="k">Enviaram</div><div class="v">${env.length} / ${linhas.filter(l=>!l.fora).length}</div></div>

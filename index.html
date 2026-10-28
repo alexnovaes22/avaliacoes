@@ -81,6 +81,8 @@ pre.code{font-family:var(--mono);font-size:.88rem;background:var(--sunk);border:
 .rev-list{list-style:none;padding:0;margin:0} .rev-list li{margin:6px 0}
 .rev-list .vazia{color:var(--bad);font-weight:700}
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;font-size:.9rem;color:var(--muted)}
+.relogio{font-weight:700;font-variant-numeric:tabular-nums;padding:2px 10px;border-radius:999px;background:var(--sel)}
+.relogio.fim{background:var(--bad);color:#fff}
 .top button{all:unset;cursor:pointer;color:var(--accent);font-weight:700}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);max-width:min(460px,92vw);padding:22px}
 dialog::backdrop{background:rgba(10,15,20,.5)}
@@ -89,7 +91,7 @@ dialog::backdrop{background:rgba(10,15,20,.5)}
 </style>
 </head>
 <body>
-<div class="preview" id="preview" hidden>Pré-visualização do professor: o envio está desativado.</div>
+<div class="preview" id="preview" hidden>Pré-visualização do professor: tudo funciona como para o aluno (inclusive o anticola), mas o envio está desativado.</div>
 <main class="wrap" id="app" aria-live="polite">
   <div class="card center"><p class="muted">Carregando…</p></div>
 </main>
@@ -116,6 +118,13 @@ function svgNorm(svg){let s=String(svg||"").trim();const head=(s.match(/^<svg[^>
   const vb=head.match(/viewBox="\s*[\d.-]+[\s,]+[\d.-]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/i);
   if(vb&&!/\swidth=/.test(head))h=h.replace(/^<svg/i,`<svg width="${vb[1]}" height="${vb[2]}"`);
   return head?h+s.slice(head.length):s}
+function ehCelular(){
+  const ua=navigator.userAgent||"";
+  if(navigator.userAgentData&&navigator.userAgentData.mobile)return true;
+  if(/Android|iPhone|iPod|Mobile|Mobi|Windows Phone|BlackBerry|Opera Mini/i.test(ua))return true;
+  const menor=Math.min(screen.width,screen.height),toque=matchMedia("(pointer: coarse)").matches&&!matchMedia("(any-pointer: fine)").matches;
+  return toque&&menor<600;
+}
 const tl=()=>String((PROVA&&PROVA.tipoAval)||"prova").toLowerCase(), tu=()=>{const t=tl();return t[0].toUpperCase()+t.slice(1)};
 const svgSrc=svg=>"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svgNorm(svg));
 const altSvg=svg=>((svg.match(/aria-label="([^"]*)"/)||[])[1]||"Imagem da questão");
@@ -139,7 +148,7 @@ function salvar(){try{localStorage.setItem(chave(),JSON.stringify({...ST,tela:TE
 
 /* ---------- modo anticola: tela cheia + vigilância de saídas ---------- */
 let pausado=false,fsAtivo=false,ultimaViol=0,MSG_REINICIO=false;
-const vigiaAtiva=()=>PROVA&&PROVA.vigiar&&!PREVIEW&&ST&&ST.emAndamento&&!pausado;
+const vigiaAtiva=()=>PROVA&&PROVA.vigiar&&ST&&ST.emAndamento&&!pausado;
 const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
 async function entrarTelaCheia(){
   const el=document.documentElement,req=el.requestFullscreen||el.webkitRequestFullscreen;
@@ -217,17 +226,26 @@ async function abrir(){
       <p class="muted small">Se acha que é um engano, mostre esta tela ao professor.</p></div>`);
     $("#bSair").onclick=sair;return;
   }
+  if(PROVA.bloquearCelular&&ehCelular()){
+    tela(`<div class="card center"><div class="big-ok" aria-hidden="true">💻</div>
+      <h1>Use um computador</h1>
+      <p>Esta ${tl()} só pode ser feita em computador ou notebook. O acesso pelo celular está bloqueado pelo professor.</p>
+      <p class="muted small">Se você está em um computador e vê esta mensagem, chame o professor.</p>
+      <p><button class="btn" id="bSair">Sair da conta</button></p></div>`);
+    $("#bSair").onclick=sair;return;
+  }
   ST=carregar();ORDEM=ordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
+  iniciarRelogio();
   document.title=PROVA.titulo;
-  if(PROVA.vigiar&&!PREVIEW&&ST.emAndamento){violacao("fechou ou recarregou a página");return}
+  if(PROVA.vigiar&&ST.emAndamento){violacao("fechou ou recarregou a página");return}
   mostrar(TELA);
 }
-function enviada(ts){
+function enviada(ts,auto){
   const quando=ts&&ts.toDate?ts.toDate().toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"";
   tela(`<div class="card center">
     <div class="big-ok" aria-hidden="true">✓</div>
     <h1>${PROVA?tu():"Avaliação"} enviada, aguardando correção</h1>
-    ${quando?`<p class="muted">Enviada em ${esc(quando)}.</p>`:""}
+    ${auto?`<p class="alert">O tempo terminou e suas respostas foram enviadas automaticamente.</p>`:""}${quando?`<p class="muted">Enviada em ${esc(quando)}.</p>`:""}
     <p>Você já pode fechar esta página.</p>
     <p><button class="btn" id="bSair">Sair da conta</button></p></div>`);
   $("#bSair").onclick=sair;
@@ -238,7 +256,7 @@ const N=()=>PROVA.questoes.length, ULT=()=>N()+1;
 function cabecalho(){
   return `<div class="top"><span>${esc(USER.displayName||USER.email)}</span><button id="bSair">Sair</button></div>
   <h1>${esc(PROVA.titulo)}</h1>
-  <div class="meta"><span>${esc(PROVA.escolaNome||"")}</span><span>${esc(PROVA.turmaNome||"")}</span><span>${esc(PROVA.disciplinaNome||"")}</span>${PROVA.valor?`<span>Valor: ${esc(PROVA.valor)} pontos</span>`:""}</div>
+  <div class="meta">${PROVA.fechaEm?'<span class="relogio" id="relogio" role="timer" aria-live="off"></span>':""}<span>${esc(PROVA.escolaNome||"")}</span><span>${esc(PROVA.turmaNome||"")}</span><span>${esc(PROVA.disciplinaNome||"")}</span>${PROVA.valor?`<span>Valor: ${esc(PROVA.valor)} pontos</span>`:""}</div>
   <nav class="nav" id="nav" aria-label="Ir para a questão"></nav>`;
 }
 function mostrar(i){
@@ -256,13 +274,14 @@ function mostrar(i){
     corpo=`<section class="card"><h2>Revisão</h2>
       <p>${faltam.length?`Faltam <b>${faltam.length}</b> questão(ões) sem resposta completa.`:"Todas as questões estão respondidas."}</p>
       <ol class="rev-list">${PROVA.questoes.map((q,k)=>`<li><button class="btn" style="padding:2px 10px" data-ir="${k+1}">Questão ${k+1}</button> ${respondida(k)?"respondida":'<span class="vazia">incompleta</span>'}</li>`).join("")}</ol>
-      <div class="acts" style="justify-content:flex-start"><button class="btn primary" id="bEnviar" ${PREVIEW?"disabled":""}>Enviar ${tl()}</button></div></section>`;
+      <div class="acts" style="justify-content:flex-start"><button class="btn primary" id="bEnviar" ${PREVIEW?"disabled":""}>Enviar ${tl()}</button>${PREVIEW?'<button class="btn" id="bFimTeste">Encerrar teste</button>':""}</div></section>`;
   }else corpo=`<section class="card" id="qcard"></section>`;
   tela(cabecalho()+corpo);
   $("#bSair").onclick=async()=>{const r=await dialogo("Sair?",`<p>Suas respostas continuam salvas neste navegador, mas a ${tl()} <b>não foi enviada</b>.</p>`,[[`Continuar a ${tl()}`,0],["Sair",1,"primary"]]);if(r)sair()};
   if(TELA>0&&TELA<ULT())questao(TELA-1);
   document.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>mostrar(+b.dataset.ir));
   $("#bEnviar")?.addEventListener("click",enviar);
+  $("#bFimTeste")?.addEventListener("click",()=>{pausado=true;ST.emAndamento=false;localStorage.removeItem(chave());sairTelaCheia();tela(`<div class="card center"><h1>Teste encerrado</h1><p>Nada foi enviado. As respostas do teste foram apagadas deste navegador.</p><p><button class="btn" onclick="location.reload()">Testar de novo</button></p></div>`)});
   montarNav();barra();window.scrollTo({top:0});
 }
 function questao(qi){
@@ -316,25 +335,43 @@ function barra(){
 }
 $("#bAnt").onclick=()=>mostrar(TELA-1);
 $("#bProx").onclick=async()=>{
-  if(TELA===0&&PROVA.vigiar&&!PREVIEW){await entrarTelaCheia();ST.emAndamento=true;pausado=false;ST.saidas=ST.saidas||0}
+  if(TELA===0&&PROVA.vigiar){await entrarTelaCheia();ST.emAndamento=true;pausado=false;ST.saidas=ST.saidas||0}
   mostrar(TELA+1);
 };
 
+/* ---------- relógio: a prova fecha sozinha no horário definido pelo professor ---------- */
+let ENVIANDO=false,relTimer=null,relSync=null;
+const fimMs=()=>PROVA&&PROVA.fechaEm?(PROVA.fechaEm.toMillis?PROVA.fechaEm.toMillis():PROVA.fechaEm.seconds*1000):0;
+function iniciarRelogio(){
+  pararRelogio();if(!fimMs())return;
+  relTimer=setInterval(tick,1000);tick();
+  relSync=setInterval(async()=>{try{const d=await db.collection("provas").doc(PROVA_ID).get();if(d.exists){const n=d.data();PROVA.fechaEm=n.fechaEm||null;PROVA.status=n.status}}catch{}},60000);
+}
+function pararRelogio(){clearInterval(relTimer);clearInterval(relSync);relTimer=relSync=null}
+function tick(){
+  const fim=fimMs();if(!fim)return;
+  const rest=Math.max(0,Math.floor((fim-Date.now())/1000)),el=$("#relogio");
+  if(el){const m=Math.floor(rest/60),s=rest%60;el.textContent=`⏱ ${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;el.classList.toggle("fim",rest<=300);el.setAttribute("aria-label",`Tempo restante: ${m} minutos`)}
+  if(rest<=5&&ST&&!PREVIEW&&!ENVIANDO&&document.querySelector(".nav")){pararRelogio();enviar(true)}
+  if(rest<=0&&PREVIEW){pararRelogio()}
+}
+
 /* ---------- envio ---------- */
-async function enviar(){
-  if(PREVIEW)return;
+async function enviar(auto){
+  if(PREVIEW||ENVIANDO)return;
   const faltam=PROVA.questoes.filter((_,k)=>!respondida(k)).length;
-  const ok=await dialogo(`Enviar a ${tl()}?`,`${faltam?`<p class="alert">Ainda há <b>${faltam}</b> questão(ões) incompleta(s).</p>`:""}<p>Depois de enviar, <b>não é possível alterar</b> as respostas.</p>`,[["Voltar",0],["Enviar agora",1,"primary"]]);
+  const ok=auto?1:await dialogo(`Enviar a ${tl()}?`,`${faltam?`<p class="alert">Ainda há <b>${faltam}</b> questão(ões) incompleta(s).</p>`:""}<p>Depois de enviar, <b>não é possível alterar</b> as respostas.</p>`,[["Voltar",0],["Enviar agora",1,"primary"]]);
   if(!ok)return;
-  const b=$("#bEnviar");b.disabled=true;b.textContent="Enviando…";pausado=true;
+  ENVIANDO=true;const b=$("#bEnviar")||document.createElement("button");b.disabled=true;b.textContent="Enviando…";pausado=true;
+  if(auto)tela(`<div class="card center"><h1>Tempo esgotado</h1><p>Enviando suas respostas automaticamente…</p></div>`);
   const id=`${PROVA_ID}_${USER.uid}`,ts=firebase.firestore.FieldValue.serverTimestamp();
   const resp=ST.resp.map(r=>Array.isArray(r)?r.map(x=>String(x).slice(0,200)):r);
   const batch=db.batch();
   batch.set(db.collection("respostas").doc(id),{provaId:PROVA_ID,turmaId:PROVA.turmaId,uid:USER.uid,email:(USER.email||"").toLowerCase(),nome:USER.displayName||"",seed:ST.seed,respostas:JSON.stringify(resp),ocorrencias:JSON.stringify({log:(ST.log||[]).slice(-60),reinicios:ST.reinicios||0}),inicioEm:ST.inicio,enviadoEm:ts});
   batch.set(db.collection("recibos").doc(id),{uid:USER.uid,provaId:PROVA_ID,enviadoEm:ts});
-  try{await batch.commit();ST.emAndamento=false;localStorage.removeItem(chave());sairTelaCheia();enviada(firebase.firestore.Timestamp.now())}
+  try{await batch.commit();ST.emAndamento=false;localStorage.removeItem(chave());sairTelaCheia();pararRelogio();enviada(firebase.firestore.Timestamp.now(),auto)}
   catch(e){
-    b.disabled=false;b.textContent=`Enviar ${tl()}`;pausado=false;
+    ENVIANDO=false;b.disabled=false;b.textContent=`Enviar ${tl()}`;pausado=false;if(auto){sairTelaCheia();mostrar(ULT())}
     const msg=e.code==="permission-denied"?"O envio foi recusado. Ela pode ter sido encerrada ou já foi enviada antes. Suas respostas continuam salvas neste navegador: mostre esta tela ao professor.":"Não consegui enviar. Verifique a internet e tente de novo. Suas respostas continuam salvas.";
     dialogo("Não foi enviado",`<p>${msg}</p>`,[["Entendi",0,"primary"]]);
   }
