@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corretor — Avaliação de HTML básico, GitHub e VS Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --paper:#F5F7FB; --surface:#FFFFFF; --ink:#1C2541; --muted:#56617D; --line:#D3DAE7;
+  --accent:#2B59C3; --accent-ink:#FFFFFF; --code-bg:#EDF1F9; --code-ink:#22306B;
+  --ok:#1F7A4D; --ok-bg:#E3F4EA; --bad:#B23A2A; --bad-bg:#FBE7E3; --blank:#8A93A8; --warn-bg:#FFF4D6; --warn-ink:#7A5200;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#0F1626; --surface:#172036; --ink:#E5EAF4; --muted:#9BA6C0; --line:#2A3553;
+    --accent:#86A8F7; --accent-ink:#0E1630; --code-bg:#1F2A47; --code-ink:#C9D6FF;
+    --ok:#6FD3A0; --ok-bg:#163A2A; --bad:#F2917F; --bad-bg:#43211D; --blank:#6E7896; --warn-bg:#3D3112; --warn-ink:#F5D27A;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:1rem;line-height:1.5}
+.wrap{max-width:72rem;margin:0 auto;padding:2.25rem 1.25rem 4rem}
+code{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;background:var(--code-bg);color:var(--code-ink);padding:.05em .35em;border-radius:4px;font-size:.9em}
+.hero .tag{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;color:var(--muted);margin:0}
+.hero h1{font-size:clamp(1.8rem,5vw,2.6rem);line-height:1.1;margin:.15rem 0 .15rem 1.25rem}
+.hero .sub{color:var(--muted);margin:.9rem 0 1.5rem}
+
+.drop{border:2px dashed var(--line);border-radius:12px;background:var(--surface);padding:2rem 1.25rem;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--code-bg)}
+.drop strong{display:block;font-size:1.15rem;margin-bottom:.25rem}
+.drop span{color:var(--muted)}
+.tools{display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;align-items:center;margin:1.25rem 0}
+.tools label{font-weight:700;font-size:.95rem}
+.tools input,.tools select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:.35rem .5rem}
+.tools input{width:5rem}
+.spacer{flex:1}
+button{font:inherit;font-weight:700;cursor:pointer;border-radius:8px;padding:.5rem .95rem;border:1px solid var(--accent);background:transparent;color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+
+.status{color:var(--muted);margin:.5rem 0}
+.resumo{font-size:1.1rem;margin:1.5rem 0 .75rem}
+.alerta{background:var(--warn-bg);color:var(--warn-ink);border-radius:8px;padding:.75rem 1rem;margin:.6rem 0}
+.alerta ul{margin:.35rem 0 0;padding-left:1.2rem}
+
+h2{font-size:1.3rem;margin:2.25rem 0 .75rem}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+th,td{padding:.45rem .5rem;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface);font-size:.85rem;color:var(--muted)}
+td.nome,th.nome{text-align:left;white-space:normal;min-width:12rem}
+td.nome button{border:0;padding:0;color:var(--ink);font-weight:700;text-align:left;background:none}
+td.nome button:hover{text-decoration:underline}
+td.c{font-weight:700}
+td.c.ok{color:var(--ok);background:var(--ok-bg)} td.c.bad{color:var(--bad);background:var(--bad-bg)} td.c.blank{color:var(--blank)}
+td.nota{font-weight:700;font-size:1rem}
+tr.det td{background:var(--paper);text-align:left;white-space:normal}
+.det-list{list-style:none;margin:0;padding:.5rem .25rem;display:grid;gap:.6rem}
+.det-list li{border-left:4px solid var(--line);padding:.15rem 0 .15rem .75rem}
+.det-list li.ok{border-color:var(--ok)} .det-list li.bad{border-color:var(--bad)}
+.det-list .q{font-weight:700}
+.det-list .m{color:var(--muted)}
+
+.qstats{display:grid;gap:.45rem;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1rem 1.25rem}
+.qrow{display:grid;grid-template-columns:3rem minmax(9rem,14rem) 1fr 3.5rem;gap:.75rem;align-items:center;font-size:.93rem}
+.qrow .lbl{color:var(--muted)}
+.qrow .trk{height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.qrow .fil{height:100%;background:var(--accent)}
+.qrow.low .fil{background:var(--bad)}
+.qrow .pct{text-align:right;font-weight:700}
+@media (max-width:640px){.qrow{grid-template-columns:2.5rem 1fr 3rem}.qrow .lbl{display:none}}
+
+details.gab{margin-top:2.25rem;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.75rem 1.25rem}
+details.gab summary{cursor:pointer;font-weight:700}
+details.gab ol{padding-left:1.4rem}
+details.gab li{margin:.35rem 0}
+.empty{color:var(--muted);text-align:center;padding:2rem 1rem}
+
+@media print{
+  .drop,.tools,details.gab,.noprint{display:none!important}
+  body{background:#fff;color:#000}
+  .tbl-wrap{overflow:visible;border:0}
+  th{position:static}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <p class="tag">&lt;h1&gt;</p>
+    <h1>Corretor da avaliação de HTML básico, GitHub e VS Code</h1>
+    <p class="tag">&lt;/h1&gt;</p>
+    <p class="sub">Uso exclusivo do professor. Os PDFs são lidos aqui no navegador; nada é enviado para a internet.</p>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Selecionar PDFs dos alunos">
+    <strong>Solte aqui os PDFs da turma</strong>
+    <span>ou clique para selecionar. Pode enviar vários de uma vez, inclusive em lotes.</span>
+    <input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+  </div>
+  <p class="status" id="status"></p>
+
+  <div class="tools noprint">
+    <label for="max">Nota máxima</label><input id="max" type="number" min="1" step="0.5" value="10">
+    <label for="filtro">Turma</label><select id="filtro"><option value="">Todas</option></select>
+    <label for="ord">Ordenar por</label>
+    <select id="ord"><option value="nome">Nome</option><option value="nota">Nota (maior primeiro)</option><option value="turma">Turma e nome</option></select>
+    <span class="spacer"></span>
+    <button id="csv" disabled>Exportar CSV</button>
+    <button id="imp" disabled>Imprimir relatório</button>
+    <button id="limpar" disabled>Limpar tudo</button>
+  </div>
+
+  <div id="saida"><p class="empty">Nenhuma prova corrigida ainda.</p></div>
+
+  <details class="gab">
+    <summary>Ver gabarito</summary>
+    <ol id="gab"></ol>
+  </details>
+</main>
+
+<script>
+const VERSION = "HTMLB1-v2";
+const BANK = [{"t": "Estrutura do documento", "e": "Qual alternativa apresenta a ordem correta em que as tags da estrutura básica são abertas em um documento HTML?", "o": ["`<html>`, `<!DOCTYPE html>`, `<head>`, `<body>`, `<title>`", "`<!DOCTYPE html>`, `<html>`, `<body>`, `<head>`, `<title>`", "`<!DOCTYPE html>`, `<head>`, `<html>`, `<title>`, `<body>`", "`<!DOCTYPE html>`, `<html>`, `<head>`, `<title>`, `<body>`", "`<html>`, `<head>`, `<body>`, `<title>`, `<!DOCTYPE html>`"]}, {"t": "Estrutura do documento", "e": "O código abaixo tem um erro de estrutura. Qual é ele?", "code": "<!DOCTYPE html>\n<html>\n<head>\n</head>\n<body>\n  <title>Minha Página</title>\n  <p>Olá!</p>\n</body>\n</html>", "o": ["Falta fechar a declaração com `</!DOCTYPE>`.", "A tag `<p>` não pode ser usada dentro de `<body>`.", "A tag `<head>` deveria vir depois de `<body>`.", "A tag `<html>` deveria ficar dentro de `<head>`.", "A tag `<title>` deveria estar dentro de `<head>`, e não dentro de `<body>`."]}, {"t": "Títulos (headings)", "e": "Um aluno está criando a página de um restaurante. Ela tem o nome do restaurante, uma seção chamada \"Cardápio\" e, dentro dela, uma subseção chamada \"Sobremesas\". Qual opção respeita a hierarquia dos títulos?", "o": ["Restaurante em `<h3>`, Cardápio em `<h1>` e Sobremesas em `<h2>`.", "Restaurante em `<h1>`, Cardápio em `<h1>` e Sobremesas em `<h1>`.", "Restaurante em `<h1>`, Cardápio em `<h2>` e Sobremesas em `<h3>`.", "Restaurante em `<h6>`, Cardápio em `<h5>` e Sobremesas em `<h4>`.", "Restaurante em `<title>`, Cardápio em `<h6>` e Sobremesas em `<h1>`."]}, {"t": "Links", "e": "Qual código cria corretamente um link com o texto \"Visite o site\" que leva ao endereço https://www.exemplo.com.br?", "o": ["`<a src=\"https://www.exemplo.com.br\">Visite o site</a>`", "`<link>https://www.exemplo.com.br</link>`", "`<a>https://www.exemplo.com.br</a href>`", "`<a url=\"https://www.exemplo.com.br\">Visite o site</a>`", "`<a href=\"https://www.exemplo.com.br\">Visite o site</a>`"]}, {"t": "Links", "e": "Para que um link abra o destino em uma nova aba do navegador, qual atributo deve ser acrescentado à tag `<a>`?", "o": ["`href=\"_new\"`", "`target=\"_blank\"`", "`open=\"tab\"`", "`target=\"_self\"`", "`new=\"true\"`"]}, {"t": "Imagens", "e": "Qual código insere corretamente a imagem gato.jpg com o texto alternativo \"Gato dormindo\"?", "o": ["`<img src=\"gato.jpg\" alt=\"Gato dormindo\"></img>`", "`<img alt=\"gato.jpg\" src=\"Gato dormindo\">`", "`<image src=\"gato.jpg\" alt=\"Gato dormindo\">`", "`<img src=\"gato.jpg\" alt=\"Gato dormindo\">`", "`<img>gato.jpg</img>`"]}, {"t": "Listas", "e": "Os passos de uma receita de bolo precisam aparecer numerados, em sequência. Qual tag é a mais adequada para criar essa lista?", "o": ["`<ul>`, pois cria uma lista com marcadores (bolinhas).", "`<table>`, pois organiza os passos em colunas.", "`<ol>`, pois cria uma lista ordenada (numerada).", "`<li>`, usada sozinha, sem nenhuma tag de lista em volta.", "`<h1>`, repetida uma vez para cada passo."]}, {"t": "Tabelas", "e": "Em uma tabela HTML, as tags `<tr>`, `<th>` e `<td>` representam, respectivamente:", "o": ["a tabela, o título e o texto.", "uma coluna, uma linha e um cabeçalho.", "uma célula de dado, um cabeçalho e uma linha.", "uma linha, o título da tabela e uma coluna.", "uma linha, uma célula de cabeçalho e uma célula de dado."]}, {"t": "Tabelas", "e": "Observe o código da tabela abaixo. Qual afirmativa descreve corretamente o que será exibido?", "code": "<table>\n  <tr>\n    <th>Nome</th>\n    <th>Idade</th>\n  </tr>\n  <tr>\n    <td>Ana</td>\n    <td>17</td>\n  </tr>\n</table>", "o": ["Uma tabela com 4 linhas e 2 colunas.", "Uma tabela com 2 linhas e 4 colunas.", "Uma tabela com 2 linhas e 2 colunas, sendo a primeira linha de cabeçalho.", "Uma tabela com 1 linha e 4 colunas, pois há apenas uma tag `<table>`.", "Uma tabela com 2 linhas e 2 colunas, todas com células de dado, sem cabeçalho."]}, {"t": "Comentários", "e": "O que o navegador exibe ao abrir uma página com o trecho de código abaixo?", "code": "<h1>Loja do Bairro</h1>\n<!-- <p>Promoção encerrada</p> -->\n<p>Aberto de segunda a sábado</p>", "o": ["Apenas \"Loja do Bairro\".", "Os três textos, sendo o comentário exibido em cinza.", "Os três textos, com os símbolos `<!--` e `-->` visíveis na tela.", "\"Loja do Bairro\" e \"Aberto de segunda a sábado\".", "Nada, pois o comentário anula a página inteira."]}, {"t": "GitHub", "e": "O que é um repositório no GitHub?", "o": ["Um espaço na nuvem que guarda os arquivos de um projeto e o histórico de todas as alterações feitas neles, permitindo trabalhar em equipe.", "Um programa instalado no computador para escrever código, como o Bloco de Notas.", "Um navegador de internet usado para abrir páginas HTML.", "Uma cópia de segurança que apaga as versões antigas a cada novo envio de arquivo.", "Uma tag HTML usada para guardar dados dentro da página."]}, {"t": "GitHub", "e": "Você está na página do seu repositório no GitHub, pelo navegador, e quer enviar o arquivo index.html que está no seu computador. Qual é o caminho correto?", "o": ["Ir em Settings, depois em Pages, e clicar em Upload.", "Clicar em Add file, escolher Upload files, arrastar o arquivo e clicar em Commit changes.", "Clicar em Code e depois em Download ZIP.", "Abrir a aba Issues, criar uma New issue e anexar o arquivo nela.", "Abrir a aba Actions e clicar em New workflow."]}, {"t": "GitHub", "e": "Para publicar o site do repositório com o GitHub Pages, com o index.html na pasta principal do projeto, qual configuração deve ser feita em Settings > Pages?", "o": ["Em Source, escolher Deploy from a branch; em Branch, selecionar main e a pasta / (root) e clicar em Save.", "Em Branch, selecionar None e clicar em Save.", "Em Branch, selecionar main e a pasta /docs, mesmo com o index.html fora dela.", "Não há configuração: o site é publicado sozinho assim que o repositório é criado.", "Em Settings > General, mudar o nome do repositório para pages e clicar em Rename."]}, {"t": "GitHub", "e": "O site já foi publicado pelo GitHub Pages. Agora o professor pede que o link do site apareça na página inicial do repositório, na seção About. Como fazer isso?", "o": ["Renomear o repositório para link-do-site.", "Clicar na engrenagem ao lado de About, marcar a opção Use your GitHub Pages website e clicar em Save changes.", "Criar um arquivo chamado link.txt com o endereço do site.", "Em Settings > General, deixar o repositório como Private.", "Clicar em Code > Download ZIP e enviar o arquivo ao professor."]}, {"t": "VS Code", "e": "Qual é uma forma correta de trabalhar no VS Code com um repositório que está no GitHub?", "o": ["Salvar o arquivo com Ctrl+S, que envia as alterações para o GitHub automaticamente, sem login.", "Instalar a extensão Live Server, que publica os arquivos no GitHub sozinha.", "Digitar o endereço do repositório na barra de pesquisa do Windows.", "Na aba Controle do Código-Fonte (Source Control), clonar o repositório (Clone Repository > Clone from GitHub), entrar com a conta do GitHub e, depois de editar, usar Commit e Sync para enviar as alterações.", "Não é possível: o VS Code não se conecta ao GitHub, só o navegador."]}];
+const KEY = [3, 4, 2, 4, 1, 3, 2, 4, 2, 3, 0, 1, 0, 1, 3];
+const XK = "ceep-html-basico-2026", SALT = "hb1#2026";
+const LETRAS = "ABCDE";
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+let alunos = [];   // resultados válidos
+let falhas = [];   // {arquivo, motivo}
+let substituidos = [];
+let aberto = null;
+
+/* ---------- utilidades ---------- */
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function rico(t){ return esc(t).split("`").map((p,i)=>i%2?"<code>"+p+"</code>":p).join(""); }
+function fnv(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).toUpperCase().padStart(8,"0"); }
+function norm(s){ return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim(); }
+function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function ordem(seed){ const R=rng(seed); return BANK.map(q=>{ const a=q.o.map((_,i)=>i); for(let i=a.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }); }
+function fmt(n,d=1){ return n.toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function notaMax(){ const v=parseFloat(document.getElementById("max").value); return v>0?v:10; }
+
+/* ---------- leitura do PDF ---------- */
+function decodificar(hex, chk){
+  const b=new Uint8Array(hex.length/2);
+  for(let i=0;i<b.length;i++) b[i]=parseInt(hex.substr(i*2,2),16)^XK.charCodeAt(i%XK.length);
+  const payload=new TextDecoder().decode(b);
+  if(fnv(SALT+payload)!==chk) throw new Error("código de verificação alterado ou corrompido");
+  const p=payload.split("|");
+  if(p.length<6) throw new Error("código incompleto");
+  if(p[0]!==VERSION) throw new Error("PDF de outra versão da prova ("+p[0]+")");
+  const ans=p[3].split("").map(c=>c==="x"?-1:parseInt(c,10));
+  if(ans.length!==BANK.length) throw new Error("número de respostas inválido");
+  return { turma:p[1], nome:p[2], ans, ts:parseInt(p[4],36), seed:parseInt(p[5],36) };
+}
+async function lerArquivo(file){
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let txt="";
+  for(let p=1;p<=pdf.numPages;p++){ const pg=await pdf.getPage(p); const tc=await pg.getTextContent(); txt+=tc.items.map(it=>it.str).join(""); }
+  const m=txt.replace(/\s+/g,"").match(/PROVA-HTMLB1:([0-9A-F]+):([0-9A-F]{8}):FIM/);
+  if(!m) throw new Error("não é o PDF gerado pela prova (código de verificação não encontrado)");
+  return decodificar(m[1],m[2]);
+}
+function corrigir(r){
+  r.res=r.ans.map((a,i)=>a<0?0:(a===KEY[i]?1:-1));
+  r.acertos=r.res.filter(x=>x===1).length;
+  r.ordem=ordem(r.seed);
+  return r;
+}
+async function processar(files){
+  files=[...files].filter(f=>/\.pdf$/i.test(f.name)||f.type==="application/pdf");
+  if(!files.length) return;
+  if(!window.pdfjsLib){ document.getElementById("status").textContent="O leitor de PDF não carregou. Verifique a internet e recarregue a página."; return; }
+  let n=0;
+  for(const f of files){
+    n++; document.getElementById("status").textContent="Lendo "+n+" de "+files.length+": "+f.name;
+    try{
+      const r=corrigir(await lerArquivo(f)); r.arquivo=f.name;
+      const k=norm(r.nome)+"|"+norm(r.turma);
+      const i=alunos.findIndex(a=>norm(a.nome)+"|"+norm(a.turma)===k);
+      if(i>=0){
+        const velho=alunos[i], manter=r.ts>=velho.ts?r:velho, descartar=manter===r?velho:r;
+        if(velho.ts!==r.ts || velho.arquivo!==r.arquivo) substituidos.push({nome:r.nome, manter:manter.arquivo, descartar:descartar.arquivo});
+        alunos[i]=manter;
+      } else alunos.push(r);
+    }catch(e){ falhas.push({arquivo:f.name, motivo:e.message||String(e)}); }
+  }
+  document.getElementById("status").textContent=files.length+(files.length>1?" arquivos lidos.":" arquivo lido.");
+  atualizarFiltro(); render();
+}
+
+/* ---------- render ---------- */
+function visiveis(){
+  const f=document.getElementById("filtro").value, o=document.getElementById("ord").value;
+  let l=alunos.filter(a=>!f||a.turma===f);
+  const cmp=(a,b)=>a.nome.localeCompare(b.nome,"pt-BR");
+  if(o==="nota") l.sort((a,b)=>b.acertos-a.acertos||cmp(a,b));
+  else if(o==="turma") l.sort((a,b)=>a.turma.localeCompare(b.turma,"pt-BR")||cmp(a,b));
+  else l.sort(cmp);
+  return l;
+}
+function nota(a){ return a.acertos/BANK.length*notaMax(); }
+function atualizarFiltro(){
+  const s=document.getElementById("filtro"), atual=s.value;
+  const turmas=[...new Set(alunos.map(a=>a.turma))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  s.innerHTML='<option value="">Todas</option>'+turmas.map(t=>'<option'+(t===atual?" selected":"")+'>'+esc(t)+'</option>').join("");
+}
+function detalhe(a){
+  return '<ol class="det-list">'+BANK.map((q,i)=>{
+    const m=a.ans[i], cls=a.res[i]===1?"ok":(a.res[i]===-1?"bad":"");
+    const marc = m<0 ? "<em>em branco</em>" : "<strong>"+LETRAS[a.ordem[i].indexOf(m)]+")</strong> "+rico(q.o[m]);
+    const cert = "<strong>"+LETRAS[a.ordem[i].indexOf(KEY[i])]+")</strong> "+rico(q.o[KEY[i]]);
+    return '<li class="'+cls+'"><div class="q">'+(i+1)+'. '+rico(q.e)+'</div>'+
+      '<div>Marcou: '+marc+'</div>'+(a.res[i]===1?"":'<div class="m">Correta: '+cert+'</div>')+'</li>';
+  }).join("")+'</ol><p class="m" style="margin:.25rem .25rem .75rem;color:var(--muted)">As letras são as que este aluno viu (a ordem das alternativas muda para cada aluno). Arquivo: '+esc(a.arquivo)+'. Gerado em '+new Date(a.ts).toLocaleString("pt-BR")+'.</p>';
+}
+function render(){
+  const out=document.getElementById("saida"), l=visiveis(), N=BANK.length;
+  ["csv","imp","limpar"].forEach(id=>document.getElementById(id).disabled=!alunos.length&&!falhas.length);
+  document.getElementById("csv").disabled=!alunos.length; document.getElementById("imp").disabled=!alunos.length;
+  let h="";
+
+  if(falhas.length) h+='<div class="alerta"><strong>Arquivos não corrigidos ('+falhas.length+')</strong><ul>'+falhas.map(f=>'<li>'+esc(f.arquivo)+': '+esc(f.motivo)+'</li>').join("")+'</ul></div>';
+  if(substituidos.length) h+='<div class="alerta"><strong>Entregas repetidas</strong> (ficou valendo a mais recente)<ul>'+substituidos.map(s=>'<li>'+esc(s.nome)+': vale '+esc(s.manter)+', ignorado '+esc(s.descartar)+'</li>').join("")+'</ul></div>';
+
+  // respostas idênticas com erros em comum
+  const grupos={}; l.forEach(a=>{ if(a.acertos<N){ const k=a.ans.join(","); (grupos[k]=grupos[k]||[]).push(a); } });
+  const iguais=Object.values(grupos).filter(g=>g.length>1&&g[0].res.filter(x=>x!==1).length>=2);
+  if(iguais.length) h+='<div class="alerta"><strong>Respostas idênticas, com os mesmos erros</strong> (vale conferir)<ul>'+iguais.map(g=>'<li>'+g.map(a=>esc(a.nome)+" ("+esc(a.turma)+")").join(", ")+'</li>').join("")+'</ul></div>';
+
+  if(!l.length){ out.innerHTML=h+'<p class="empty">Nenhuma prova corrigida ainda.</p>'; return; }
+
+  const notas=l.map(nota), media=notas.reduce((s,x)=>s+x,0)/notas.length;
+  const acimaMedia=notas.filter(x=>x>=notaMax()*0.6).length;
+  h+='<p class="resumo">'+l.length+(l.length>1?" provas corrigidas":" prova corrigida")+'. Média da turma: <strong>'+fmt(media)+'</strong> de '+fmt(notaMax(),notaMax()%1?1:0)+
+     '. Maior nota '+fmt(Math.max(...notas))+', menor '+fmt(Math.min(...notas))+'. '+acimaMedia+' de '+l.length+' com 60% ou mais.</p>';
+
+  h+='<div class="tbl-wrap"><table><thead><tr><th class="nome">Aluno</th><th>Turma</th>'+BANK.map((_,i)=>'<th>'+(i+1)+'</th>').join("")+'<th>Acertos</th><th>Nota</th></tr></thead><tbody>';
+  l.forEach((a,idx)=>{
+    const id=norm(a.nome)+"|"+norm(a.turma);
+    h+='<tr><td class="nome"><button data-id="'+esc(id)+'" aria-expanded="'+(aberto===id)+'">'+esc(a.nome)+'</button></td><td>'+esc(a.turma)+'</td>'+
+      a.res.map(r=>r===1?'<td class="c ok" title="Certa">✓</td>':r===-1?'<td class="c bad" title="Errada">✗</td>':'<td class="c blank" title="Em branco">–</td>').join("")+
+      '<td>'+a.acertos+'/'+N+'</td><td class="nota">'+fmt(nota(a))+'</td></tr>';
+    if(aberto===id) h+='<tr class="det"><td colspan="'+(N+4)+'">'+detalhe(a)+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+
+  h+='<h2>Acerto por questão</h2><div class="qstats">'+BANK.map((q,i)=>{
+    const p=l.filter(a=>a.res[i]===1).length/l.length*100;
+    return '<div class="qrow'+(p<50?" low":"")+'"><span>Q'+(i+1)+'</span><span class="lbl">'+esc(q.t)+'</span><div class="trk"><div class="fil" style="width:'+p+'%"></div></div><span class="pct">'+Math.round(p)+'%</span></div>';
+  }).join("")+'</div>';
+
+  const temas=[...new Set(BANK.map(q=>q.t))];
+  h+='<h2>Acerto por conteúdo</h2><div class="qstats">'+temas.map(t=>{
+    const idx=BANK.map((q,i)=>q.t===t?i:-1).filter(i=>i>=0);
+    const tot=l.length*idx.length, ac=l.reduce((s,a)=>s+idx.filter(i=>a.res[i]===1).length,0), p=ac/tot*100;
+    return '<div class="qrow'+(p<50?" low":"")+'"><span>'+idx.length+'q</span><span class="lbl" style="display:block;color:var(--ink)">'+esc(t)+'</span><div class="trk"><div class="fil" style="width:'+p+'%"></div></div><span class="pct">'+Math.round(p)+'%</span></div>';
+  }).join("")+'</div>';
+
+  out.innerHTML=h;
+  out.querySelectorAll("td.nome button").forEach(b=>b.onclick=()=>{ aberto = aberto===b.dataset.id?null:b.dataset.id; render(); });
+}
+
+/* ---------- exportação ---------- */
+function exportarCSV(){
+  const l=visiveis(), N=BANK.length;
+  const linhas=[["Aluno","Turma",...BANK.map((_,i)=>"Q"+(i+1)),"Acertos","Nota"].join(";")];
+  l.forEach(a=>linhas.push(['"'+a.nome.replace(/"/g,'""')+'"','"'+a.turma.replace(/"/g,'""')+'"',
+    ...a.ans.map((m,i)=>m<0?"":LETRAS[a.ordem[i].indexOf(m)]+(a.res[i]===1?" (C)":" (E)")),
+    a.acertos, fmt(nota(a))].join(";")));
+  const blob=new Blob(["\uFEFF"+linhas.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const u=URL.createObjectURL(blob), el=document.createElement("a");
+  el.href=u; el.download="Notas_Prova_HTML"+(document.getElementById("filtro").value?"_"+document.getElementById("filtro").value.replace(/[^\w]+/g,"_"):"")+".csv";
+  document.body.appendChild(el); el.click(); el.remove(); setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+
+/* ---------- eventos ---------- */
+const drop=document.getElementById("drop"), inp=document.getElementById("file");
+drop.onclick=()=>inp.click();
+drop.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); inp.click(); } };
+inp.onchange=()=>{ processar(inp.files); inp.value=""; };
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop",e=>processar(e.dataTransfer.files));
+document.getElementById("max").oninput=render;
+document.getElementById("filtro").onchange=render;
+document.getElementById("ord").onchange=render;
+document.getElementById("csv").onclick=exportarCSV;
+document.getElementById("imp").onclick=()=>window.print();
+document.getElementById("limpar").onclick=()=>{ if(confirm("Remover todas as provas carregadas?")){ alunos=[]; falhas=[]; substituidos=[]; aberto=null; document.getElementById("status").textContent=""; atualizarFiltro(); render(); } };
+document.getElementById("gab").innerHTML=BANK.map((q,i)=>'<li>'+rico(q.e)+'<br><strong>Resposta:</strong> '+rico(q.o[KEY[i]])+'</li>').join("");
+render();
+</script>
+</body>
+</html>
