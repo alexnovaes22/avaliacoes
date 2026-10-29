@@ -27,6 +27,10 @@
 }
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:20px}
+body.travado .wrap,body.travado .bar{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.travado input,body.travado textarea{-webkit-user-select:text;user-select:text}
+@media print{body{display:none!important}}
+.aviso-bloq{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;padding:8px 16px;border-radius:999px;font-weight:700;z-index:99;font-size:.9rem}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
 button,input{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
@@ -156,6 +160,25 @@ async function entrarTelaCheia(){
   if(!req){fsAtivo=false;return}
   try{await req.call(el,{navigationUI:"hide"});fsAtivo=true}catch{fsAtivo=false}
 }
+const fsSuportado=()=>{const el=document.documentElement;return !!((el.requestFullscreen||el.webkitRequestFullscreen)&&(document.fullscreenEnabled||document.webkitFullscreenEnabled))};
+/* toda entrada nas questões passa por aqui: com anticola, só entra em tela cheia */
+async function irPara(i){
+  if(PROVA&&PROVA.vigiar&&i>0&&(!ST.emAndamento||(fsSuportado()&&!fsEl()))){
+    await entrarTelaCheia();
+    if(fsSuportado()&&!fsEl()){telaTelaCheia(i);return}
+    if(!fsSuportado()&&!ST.semFsLog){ST.log=(ST.log||[]).concat({t:Date.now(),tipo:"aparelho sem suporte a tela cheia",info:true});ST.semFsLog=true}
+    ST.emAndamento=true;pausado=false;ST.saidas=ST.saidas||0;salvar();
+  }
+  mostrar(i);
+}
+function telaTelaCheia(destino){
+  tela(`<div class="card center"><div class="big-ok" aria-hidden="true">⛶</div>
+    <h1>A ${tl()} precisa ser feita em tela cheia</h1>
+    <p>O navegador não abriu a tela cheia. Clique no botão abaixo para tentar de novo.</p>
+    <p><button class="btn primary" id="bFs">Entrar em tela cheia e continuar</button></p>
+    <p class="small muted">Se continuar sem funcionar, pressione <b>F11</b> e clique no botão de novo, ou chame o professor.</p></div>`);
+  $("#bFs").onclick=()=>irPara(destino);
+}
 function sairTelaCheia(){fsAtivo=false;const ex=document.exitFullscreen||document.webkitExitFullscreen;if(fsEl()&&ex)ex.call(document).catch?.(()=>{})}
 function violacao(tipo){
   if(!vigiaAtiva())return;
@@ -179,9 +202,34 @@ function telaAviso(){
     <p>Sair da tela cheia, trocar de aba ou abrir outra janela não é permitido.</p>
     <p class="alert"><b>${resta===0?"Este foi o último aviso.":`Restam ${resta} aviso(s).`}</b> Na próxima saída, a ${tl()} será encerrada, suas respostas serão apagadas e você terá que entrar de novo e recomeçar do zero.</p>
     <p><button class="btn primary" id="bVoltarProva">Voltar à ${tl()}</button></p></div>`);
-  $("#bVoltarProva").onclick=async()=>{await entrarTelaCheia();pausado=false;mostrar(TELA||1)};
+  $("#bVoltarProva").onclick=()=>{pausado=false;irPara(TELA||1)};
 }
 document.addEventListener("visibilitychange",()=>{if(document.hidden)violacao("trocou de aba ou minimizou")});
+setInterval(()=>{if(vigiaAtiva()&&TELA>0&&fsSuportado()&&!fsEl())violacao("estava fora da tela cheia")},2500);
+/* bloqueios: botão direito, copiar, colar, selecionar, imprimir e atalhos de código */
+let ultTent={};
+function tentativa(desc){
+  const el=document.querySelector(".aviso-bloq")||document.body.appendChild(Object.assign(document.createElement("div"),{className:"aviso-bloq"}));
+  el.textContent="Esta ação está bloqueada durante a avaliação.";clearTimeout(el._t);el._t=setTimeout(()=>el.remove(),1800);
+  if(!PROVA||!ST)return;const agora=Date.now();if(ultTent[desc]&&agora-ultTent[desc]<4000)return;ultTent[desc]=agora;
+  ST.log=(ST.log||[]).concat({t:agora,tipo:"tentou "+desc,tentativa:true}).slice(-60);salvar();
+}
+const emCampo=e=>!!(e.target&&e.target.closest&&e.target.closest("input,textarea"));
+document.addEventListener("contextmenu",e=>{if(!PROVA)return;e.preventDefault();tentativa("usar o botão direito")},true);
+["copy","cut"].forEach(ev=>document.addEventListener(ev,e=>{if(!PROVA)return;e.preventDefault();tentativa("copiar texto")},true));
+document.addEventListener("paste",e=>{if(!PROVA)return;e.preventDefault();tentativa("colar texto")},true);
+document.addEventListener("dragstart",e=>{if(PROVA)e.preventDefault()},true);
+document.addEventListener("selectstart",e=>{if(PROVA&&!emCampo(e))e.preventDefault()},true);
+document.addEventListener("keydown",e=>{
+  if(!PROVA)return;const k=(e.key||"").toLowerCase(),c=e.ctrlKey||e.metaKey;let o="";
+  if(k==="f12"||(c&&e.shiftKey&&["i","j","c","k"].includes(k))||(c&&e.altKey&&["i","j","c"].includes(k)))o="abrir as ferramentas de código";
+  else if(c&&k==="u")o="ver o código da página";
+  else if(c&&(k==="s"||k==="p"))o=k==="s"?"salvar a página":"imprimir a página";
+  else if(c&&(k==="c"||k==="x"))o="copiar texto";
+  else if(c&&k==="a"&&!emCampo(e))o="selecionar tudo";
+  if(o){e.preventDefault();e.stopPropagation();tentativa(o)}
+},true);
+document.addEventListener("keyup",e=>{if(PROVA&&e.key==="PrintScreen")tentativa("capturar a tela")},true);
 window.addEventListener("blur",()=>setTimeout(()=>{if(!document.hasFocus())violacao("trocou de janela ou programa")},1200));
 ["fullscreenchange","webkitfullscreenchange"].forEach(ev=>document.addEventListener(ev,()=>{if(!fsEl()&&fsAtivo){fsAtivo=false;violacao("saiu da tela cheia")}}));
 function respondida(i){const q=PROVA.questoes[i],r=ST.resp[i];if(q.tipo==="mc")return r>=0;if(q.tipo==="vf")return r.every(x=>x);return r.every(x=>String(x).trim())}
@@ -240,7 +288,7 @@ async function abrir(){
   ST=carregar();ORDEM=ordem(ST.seed);QORD=qordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
   if(ST.avisoReinicio){MSG_REINICIO=true;ST.avisoReinicio=false;TELA=0;salvar()}
   iniciarRelogio();
-  document.title=PROVA.titulo;
+  document.title=PROVA.titulo;document.body.classList.add("travado");
   if(PROVA.vigiar&&ST.emAndamento){violacao("fechou ou recarregou a página");return}
   mostrar(TELA);
 }
@@ -283,7 +331,7 @@ function mostrar(i){
   tela(cabecalho()+corpo);
   $("#bSair").onclick=async()=>{const r=await dialogo("Sair?",`<p>Suas respostas continuam salvas neste navegador, mas a ${tl()} <b>não foi enviada</b>.</p>`,[[`Continuar a ${tl()}`,0],["Sair",1,"primary"]]);if(r)sair()};
   if(TELA>0&&TELA<ULT())questao(QORD[TELA-1],TELA);
-  document.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>mostrar(+b.dataset.ir));
+  document.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>irPara(+b.dataset.ir));
   $("#bEnviar")?.addEventListener("click",()=>enviar(false));
   $("#bFimTeste")?.addEventListener("click",()=>{pausado=true;ST.emAndamento=false;localStorage.removeItem(chave());sairTelaCheia();tela(`<div class="card center"><h1>Teste encerrado</h1><p>Nada foi enviado. As respostas do teste foram apagadas deste navegador.</p><p><button class="btn" onclick="location.reload()">Testar de novo</button></p></div>`)});
   montarNav();barra();window.scrollTo({top:0});
@@ -326,7 +374,7 @@ function questao(qi,pos){
 }
 function montarNav(){
   const nav=$("#nav");if(!nav)return;nav.innerHTML="";
-  const mk=(txt,i,feita,label)=>{const b=document.createElement("button");b.textContent=txt;if(feita)b.className="feita";if(TELA===i)b.setAttribute("aria-current","step");b.setAttribute("aria-label",label);b.onclick=()=>mostrar(i);nav.appendChild(b)};
+  const mk=(txt,i,feita,label)=>{const b=document.createElement("button");b.textContent=txt;if(feita)b.className="feita";if(TELA===i)b.setAttribute("aria-current","step");b.setAttribute("aria-label",label);b.onclick=()=>irPara(i);nav.appendChild(b)};
   mk("Início",0,false,"Início");
   PROVA.questoes.forEach((_,k)=>{const r=respondida(QORD[k]);mk(String(k+1),k+1,r,`Questão ${k+1}${r?", respondida":", sem resposta"}`)});
   mk("Revisão",ULT(),false,"Revisão e envio");
@@ -337,11 +385,8 @@ function barra(){
   $("#bAnt").disabled=TELA===0;$("#bProx").hidden=TELA===ULT();
   $("#bProx").textContent=TELA===0?"Começar":TELA===N()?"Revisar":"Próxima";
 }
-$("#bAnt").onclick=()=>mostrar(TELA-1);
-$("#bProx").onclick=async()=>{
-  if(TELA===0&&PROVA.vigiar){await entrarTelaCheia();ST.emAndamento=true;pausado=false;ST.saidas=ST.saidas||0}
-  mostrar(TELA+1);
-};
+$("#bAnt").onclick=()=>irPara(TELA-1);
+$("#bProx").onclick=()=>irPara(TELA+1);
 
 /* ---------- relógio: a prova fecha sozinha no horário definido pelo professor ---------- */
 let ENVIANDO=false,relTimer=null,relSync=null;
