@@ -8,5 +8,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "1047880775963",
   appId: "1:1047880775963:web:d51e4337c2f529edc07bbe"
 };
-/* E-mail do professor: único com acesso ao painel, gabaritos e respostas. */
-window.PROFESSOR_EMAIL = "alex.novaes@escola.pr.gov.br";
+/* E-mails do professor: os únicos com acesso ao painel, gabaritos e respostas.
+   >>> TROQUE "SEU.GMAIL.AQUI@gmail.com" PELO SEU GMAIL PESSOAL (o mesmo endereço também no firestore.rules) <<< */
+window.PROFESSOR_EMAILS = ["alex.novaes@escola.pr.gov.br", "SEU.GMAIL.AQUI@gmail.com"];
+window.PROFESSOR_EMAIL = window.PROFESSOR_EMAILS[0];

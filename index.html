@@ -293,7 +293,7 @@ async function sair(){try{await auth.signOut()}catch{}}
 
 async function abrir(){
   tela(`<div class="card center"><p class="muted">Abrindo…</p></div>`);
-  PREVIEW=(USER.email||"").toLowerCase()===String(PROFESSOR_EMAIL).toLowerCase();
+  PREVIEW=(window.PROFESSOR_EMAILS||[PROFESSOR_EMAIL]).map(e=>String(e).toLowerCase()).includes((USER.email||"").toLowerCase());
   $("#preview").hidden=!PREVIEW;
   if(!PREVIEW){
     try{const r=await db.collection("recibos").doc(`${PROVA_ID}_${USER.uid}`).get();if(r.exists){try{const d=await db.collection("provas").doc(PROVA_ID).get();if(d.exists)PROVA=d.data()}catch{}enviada(r.data().enviadoEm);return}}catch{}
@@ -302,7 +302,7 @@ async function abrir(){
   catch(e){
     tela(`<div class="card"><div class="top"><span>${esc(USER.email)}</span><button id="bSair">Trocar de conta</button></div>
       <h1>Indisponível no momento</h1>
-      <p>${e.code==="not-found"?"Este link não existe. Confira com o professor.":"Esta avaliação não está aberta ou o seu e-mail não está na lista da turma."}</p>
+      <p>${e.code==="not-found"?"Este link não existe. Confira com o professor.":"Esta avaliação não está aberta, ou a sua conta não tem acesso a esta turma. Use o e-mail da escola cadastrado pelo professor ou uma conta Gmail."}</p>
       <p class="muted small">Se acha que é um engano, mostre esta tela ao professor.</p></div>`);
     $("#bSair").onclick=sair;return;
   }

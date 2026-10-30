@@ -176,7 +176,7 @@ const msDe=t=>t?(t.toMillis?t.toMillis():(t.seconds||0)*1000):0;
 const hhmm=ms=>new Date(ms).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
 function efStatus(p){if(p.status==="aberta"&&p.fechaEm&&msDe(p.fechaEm)<=Date.now())return "encerrada";return p.status}
 function janela(dur){return dur>0?{abertaEm:FV.serverTimestamp(),fechaEm:TSV.fromMillis(Date.now()+dur*60000)}:{abertaEm:FV.serverTimestamp(),fechaEm:FV.delete()}}
-const ehProf=u=>u&&(u.email||"").toLowerCase()===String(PROFESSOR_EMAIL).toLowerCase();
+const ehProf=u=>u&&(window.PROFESSOR_EMAILS||[PROFESSOR_EMAIL]).map(e=>String(e).toLowerCase()).includes((u.email||"").toLowerCase());
 
 $("#bLogin").onclick=async()=>{
   const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
@@ -260,6 +260,7 @@ function formTurma(t){
     </div>
     <label class="f" style="margin-top:14px">Alunos: um por linha, com nome e e-mail (pode colar do Classroom ou de uma planilha)
       <textarea id="fAl" rows="12" placeholder="Maria da Silva; maria.silva@escola.pr.gov.br">${esc((t?.alunos||[]).map(a=>`${a.nome}; ${a.email}`).join("\n"))}</textarea></label>
+      <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="fGmail" ${t?.aceitaGmail===false?"":"checked"}> Aceitar também alunos entrando com <b>qualquer conta Gmail</b> (aparecem nos resultados como “conta Gmail”)</label>
     <p class="hint" id="fCont"></p>
     <div class="row" style="margin-top:10px"><button class="btn primary" id="fSalvar">Salvar</button><button class="btn" id="fVoltar">Cancelar</button>${t?'<button class="btn danger" id="fDel">Excluir</button>':""}</div></section>`;
   const conta=()=>{$("#fCont").textContent=`${parseAlunos($("#fAl").value).length} aluno(s) reconhecido(s). Linhas sem e-mail são ignoradas.`};
@@ -267,7 +268,7 @@ function formTurma(t){
   $("#fSalvar").onclick=async()=>{
     const nome=$("#fNome").value.trim();if(!nome){alert("Informe o nome da turma.");return}
     const alunos=parseAlunos($("#fAl").value);
-    const d={escolaId:$("#fEsc").value,nome,ano:+$("#fAno").value||ANO,alunos,emails:alunos.map(a=>a.email)};
+    const d={escolaId:$("#fEsc").value,nome,ano:+$("#fAno").value||ANO,alunos,emails:alunos.map(a=>a.email),aceitaGmail:$("#fGmail").checked};
     if(t)await db.collection("turmas").doc(t.id).update(d);else await db.collection("turmas").add(d);
     await carregarTudo();voltar();toast("Turma salva");
   };
@@ -647,7 +648,7 @@ function desenharResultados(){
       <div class="kpi"><div class="k">Menor nota</div><div class="v">${notas.length?nf1(Math.min(...notas)):"–"}</div></div>
     </div>
     <div class="tw"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado em</th><th class="r">Saídas</th><th class="r">Acertos</th><th class="r">Nota</th><th></th></tr></thead><tbody>
-    ${linhas.map((l,i)=>`<tr><td>${esc(l.aluno.nome)}<br><span class="small muted">${esc(l.aluno.email)}${l.fora?" · fora da lista da turma":""}</span></td>
+    ${linhas.map((l,i)=>`<tr><td>${esc(l.aluno.nome)}<br><span class="small muted">${esc(l.aluno.email)}${l.fora?(/@gmail\.com$/i.test(l.aluno.email)?" · conta Gmail":" · fora da lista da turma"):""}</span></td>
       <td>${l.envio?'<span class="pill aberta">Enviou</span>':l.rasc?`<span class="pill" style="background:var(--warn-bg);border-color:#B9782A">Em andamento</span><br><span class="small muted">${l.rasc.respondidas}/${l.rasc.total} respondidas${l.rasc.salvoEm?" · salvo "+fmtData(l.rasc.salvoEm):""}</span>`:'<span class="pill">Pendente</span>'}</td>
       <td class="small">${l.envio?esc(fmtData(l.envio.enviadoEm)):""}</td>
       <td class="r num">${l.envio?(l.c.oc.saidas||l.c.oc.tent?`${l.c.oc.saidas?`<span style="color:var(--bad);font-weight:700">${l.c.oc.saidas}</span>`:"0"}${l.c.oc.reinicios?`<br><span class="small">${l.c.oc.reinicios} reinício(s)</span>`:""}${l.c.oc.tent?`<br><span class="small" style="color:#B9782A">${l.c.oc.tent} tentativa(s)</span>`:""}`:"0"):""}</td>
