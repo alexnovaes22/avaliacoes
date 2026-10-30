@@ -334,7 +334,9 @@ async function copiar(t){try{await navigator.clipboard.writeText(t);toast("Link 
 
 /* ================= EDITOR ================= */
 let ED=null;
-function novaQuestao(tipo="mc"){return {tipo,topico:"",enunciado:"",codigo:"",imagem:"",peso:1,anulada:false,alternativas:["","","","",""],correta:-1,afirmacoes:[{texto:"",v:true},{texto:"",v:true}]}}
+function novaQuestao(tipo="mc"){return {tipo,topico:"",enunciado:"",codigo:"",imagem:"",peso:1,anulada:false,alternativas:["","","","",""],correta:-1,afirmacoes:[{texto:"",v:true},{texto:"",v:true}],pares:[{t:"",img:""},{t:"",img:""}],palavras:[{p:"",dica:""}]}}
+const ofusca=w=>btoa([...w].map((ch,i)=>String.fromCharCode(ch.charCodeAt(0)^(73+i%7))).join(""));
+const palForca=w=>norm(w).toUpperCase().replace(/[^A-Z ]/g,"").replace(/\s+/g," ").trim();
 async function editor(p){
   if(p){const g=await db.collection("gabaritos").doc(p.id).get();ED={id:p.id,status:p.status,...(g.exists?JSON.parse(g.data().fonte):{titulo:p.titulo,questoes:[]})}}
   else ED={id:null,status:"rascunho",titulo:"",instrucoes:"",valor:10,embaralhar:true,disciplinaId:FILTRO.disc||"",questoes:[novaQuestao()]};
@@ -347,6 +349,8 @@ function faltas(){const f=[];ED.questoes.forEach((q,i)=>{
   if(q.tipo==="mc"){if(q.alternativas.filter(a=>a.trim()).length<2)f.push([i,"menos de 2 alternativas"]);else if(q.correta<0||!q.alternativas[q.correta]?.trim())f.push([i,"alternativa correta não marcada"])}
   if(q.tipo==="vf"&&!q.afirmacoes.some(a=>a.texto.trim()))f.push([i,"sem afirmações"]);
   if(q.tipo==="lacuna"&&!lacunas(q.enunciado).length)f.push([i,"sem lacunas [[ ]] no enunciado"]);
+  if(q.tipo==="memoria"){const ok=(q.pares||[]).filter(p=>p.t.trim()&&p.img.trim());if(ok.length<2)f.push([i,"o jogo precisa de pelo menos 2 pares completos"]);if((q.pares||[]).some(p=>p.img.trim().startsWith("<")&&!svgOk(p.img)))f.push([i,"imagem de par inválida"])}
+  if(q.tipo==="forca"&&!(q.palavras||[]).some(w=>palForca(w.p)))f.push([i,"sem palavras"]);
 });return f}
 function desenharEditor(){
   const ds=DISC.filter(d=>turma(d.turmaId)?.ano===ANO);
@@ -375,7 +379,7 @@ function desenharEditor(){
   ${F.length?`<div class="alert bad"><b>Pendências antes de abrir:</b> ${F.map(([i,m])=>`questão ${i+1} (${esc(m)})`).join("; ")}.</div>`:""}
   <div id="eQs">${ED.questoes.map((q,i)=>qHTML(q,i,fset.has(i))).join("")}</div>
   <div class="row noprint" style="margin-bottom:16px">
-    <button class="btn" data-add="mc">+ Múltipla escolha</button><button class="btn" data-add="vf">+ Verdadeiro ou falso</button><button class="btn" data-add="lacuna">+ Completar lacunas</button>
+    <button class="btn" data-add="mc">+ Múltipla escolha</button><button class="btn" data-add="vf">+ Verdadeiro ou falso</button><button class="btn" data-add="lacuna">+ Completar lacunas</button><button class="btn" data-add="memoria">+ Jogo da memória</button><button class="btn" data-add="forca">+ Jogo da forca</button>
   </div>
   <section class="panel"><div class="row">
     <button class="btn primary" id="eSalvar">Salvar</button>
@@ -388,11 +392,13 @@ function desenharEditor(){
   ligarEditor();
 }
 function qHTML(q,i,falta){
-  const tipoNome={mc:"Múltipla escolha",vf:"Verdadeiro ou falso",lacuna:"Completar lacunas"}[q.tipo];
+  const tipoNome={mc:"Múltipla escolha",vf:"Verdadeiro ou falso",lacuna:"Completar lacunas",memoria:"Jogo da memória",forca:"Jogo da forca"}[q.tipo];
   let corpo="";
   if(q.tipo==="mc")corpo=`<div class="hint" style="margin:6px 0">Marque a alternativa correta:</div>${q.alternativas.map((a,k)=>`<div class="alt"><input type="radio" name="c${i}" data-q="${i}" data-correta="${k}" ${q.correta===k?"checked":""} aria-label="Alternativa ${LETRAS[k]} é a correta"><b>${LETRAS[k]})</b><input type="text" data-q="${i}" data-alt="${k}" value="${esc(a)}"><button class="btn sm" data-q="${i}" data-rmalt="${k}" aria-label="Remover alternativa ${LETRAS[k]}" ${q.alternativas.length<=2?"disabled":""}>×</button></div>`).join("")}
     ${q.alternativas.length<8?`<button class="btn sm" data-q="${i}" data-addalt>+ alternativa</button>`:""}`;
   if(q.tipo==="vf")corpo=`<div class="hint" style="margin:6px 0">Afirmações e o gabarito de cada uma:</div>${q.afirmacoes.map((a,k)=>`<div class="alt" style="grid-template-columns:auto 1fr auto auto"><b>${k+1}.</b><input type="text" data-q="${i}" data-af="${k}" value="${esc(a.texto)}"><select data-q="${i}" data-afv="${k}" style="width:auto"><option value="1" ${a.v?"selected":""}>Verdadeira</option><option value="0" ${!a.v?"selected":""}>Falsa</option></select><button class="btn sm" data-q="${i}" data-rmaf="${k}" ${q.afirmacoes.length<=1?"disabled":""} aria-label="Remover afirmação ${k+1}">×</button></div>`).join("")}<button class="btn sm" data-q="${i}" data-addaf>+ afirmação</button>`;
+  if(q.tipo==="memoria"){q.pares||=[];corpo=`<div class="hint" style="margin:6px 0">Pares: palavra e imagem. A imagem pode ser um código SVG ou um emoji. O aluno vira as cartas até juntar cada palavra com a sua imagem.</div>${q.pares.map((p,k)=>`<div class="alt" style="grid-template-columns:auto 1fr 1.4fr auto auto;align-items:center"><b>${k+1}.</b><input type="text" data-q="${i}" data-mp="${k}" value="${esc(p.t)}" placeholder="Palavra" aria-label="Palavra do par ${k+1}"><input type="text" data-q="${i}" data-mi="${k}" value="${esc(p.img)}" placeholder="SVG ou emoji" aria-label="Imagem do par ${k+1}"><span class="mini">${p.img.trim().startsWith("<")&&svgOk(p.img)?`<img src="${svgSrc(p.img)}" alt="" style="width:40px;height:40px">`:`<span style="font-size:1.6rem">${esc(p.img.trim().startsWith("<")?"":p.img)}</span>`}</span><button class="btn sm" data-q="${i}" data-rmpar="${k}" ${q.pares.length<=2?"disabled":""} aria-label="Remover par ${k+1}">×</button></div>`).join("")}${q.pares.length<15?`<button class="btn sm" data-q="${i}" data-addpar>+ par</button>`:""}`}
+  if(q.tipo==="forca"){q.palavras||=[];corpo=`<div class="hint" style="margin:6px 0">Palavras e dicas. Acentos são ignorados no jogo. Cada palavra permite até 6 erros.</div>${q.palavras.map((w,k)=>`<div class="alt" style="grid-template-columns:auto 1fr 2fr auto;align-items:center"><b>${k+1}.</b><input type="text" data-q="${i}" data-fp="${k}" value="${esc(w.p)}" placeholder="Palavra" aria-label="Palavra ${k+1}"><input type="text" data-q="${i}" data-fdi="${k}" value="${esc(w.dica)}" placeholder="Dica" aria-label="Dica ${k+1}"><button class="btn sm" data-q="${i}" data-rmpal="${k}" ${q.palavras.length<=1?"disabled":""} aria-label="Remover palavra ${k+1}">×</button></div>`).join("")}${q.palavras.length<10?`<button class="btn sm" data-q="${i}" data-addpal>+ palavra</button>`:""}`}
   if(q.tipo==="lacuna"){const l=lacunas(q.enunciado);corpo=`<div class="hint" style="margin-top:6px">${l.length?`${l.length} lacuna(s): ${l.map((a,k)=>`${k+1}) ${esc(a.join(" ou "))}`).join(" · ")}`:"Nenhuma lacuna: escreva as respostas entre [[ ]] no enunciado."}</div>`}
   return `<div class="qed ${falta?"falta":""}" id="qe${i}">
     <div class="qed-h"><span class="row" style="align-items:center"><span class="n">${i+1}</span><b>${tipoNome}</b></span>
@@ -423,6 +429,14 @@ function ligarEditor(){
   $$("[data-addalt]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].alternativas.push("");redesenha()});
   $$("[data-rmalt]").forEach(b=>b.onclick=()=>{const q=ED.questoes[+b.dataset.q],k=+b.dataset.rmalt;q.alternativas.splice(k,1);if(q.correta===k)q.correta=-1;else if(q.correta>k)q.correta--;redesenha()});
   $$("[data-addaf]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].afirmacoes.push({texto:"",v:true});redesenha()});
+  $$("[data-mp]").forEach(el=>el.oninput=()=>{ED.questoes[+el.dataset.q].pares[+el.dataset.mp].t=el.value});
+  $$("[data-mi]").forEach(el=>el.onchange=()=>{ED.questoes[+el.dataset.q].pares[+el.dataset.mi].img=el.value;redesenha()});
+  $$("[data-addpar]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].pares.push({t:"",img:""});redesenha()});
+  $$("[data-rmpar]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].pares.splice(+b.dataset.rmpar,1);redesenha()});
+  $$("[data-fp]").forEach(el=>el.oninput=()=>{ED.questoes[+el.dataset.q].palavras[+el.dataset.fp].p=el.value});
+  $$("[data-fdi]").forEach(el=>el.oninput=()=>{ED.questoes[+el.dataset.q].palavras[+el.dataset.fdi].dica=el.value});
+  $$("[data-addpal]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].palavras.push({p:"",dica:""});redesenha()});
+  $$("[data-rmpal]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].palavras.splice(+b.dataset.rmpal,1);redesenha()});
   $$("[data-rmaf]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].afirmacoes.splice(+b.dataset.rmaf,1);redesenha()});
   $$("[data-add]").forEach(b=>b.onclick=()=>{ED.questoes.push(novaQuestao(b.dataset.add));redesenha();setTimeout(()=>document.getElementById("qe"+(ED.questoes.length-1))?.scrollIntoView({block:"center"}),50)});
   $$("[data-rmq]").forEach(b=>b.onclick=()=>{if(confirm(`Excluir a questão ${+b.dataset.q+1}?`)){ED.questoes.splice(+b.dataset.q,1);redesenha()}});
@@ -467,11 +481,13 @@ function publico(fonte){
     if(q.tipo==="mc"){const alts=q.alternativas.map(a=>a.trim());b.enunciado=q.enunciado;b.alternativas=alts}
     if(q.tipo==="vf"){b.enunciado=q.enunciado;b.afirmacoes=q.afirmacoes.filter(a=>a.texto.trim()).map(a=>a.texto.trim())}
     if(q.tipo==="lacuna"){b.enunciado=q.enunciado.replace(/\[\[(.+?)\]\]/g,"{{#}}")}
+    if(q.tipo==="memoria"){b.enunciado=q.enunciado;b.pares=(q.pares||[]).filter(p=>p.t.trim()&&p.img.trim()).map(p=>({t:p.t.trim(),img:p.img.trim()}))}
+    if(q.tipo==="forca"){b.enunciado=q.enunciado;b.palavras=(q.palavras||[]).filter(w=>palForca(w.p)).map(w=>({dica:w.dica.trim(),cod:ofusca(palForca(w.p))}))}
     return b;
   });
 }
 function gabaritoDe(fonte){
-  return fonte.questoes.map(q=>q.tipo==="mc"?q.correta:q.tipo==="vf"?q.afirmacoes.filter(a=>a.texto.trim()).map(a=>a.v?"V":"F"):lacunas(q.enunciado));
+  return fonte.questoes.map(q=>q.tipo==="mc"?q.correta:q.tipo==="vf"?q.afirmacoes.filter(a=>a.texto.trim()).map(a=>a.v?"V":"F"):q.tipo==="memoria"?(q.pares||[]).filter(p=>p.t.trim()&&p.img.trim()).length:q.tipo==="forca"?(q.palavras||[]).map(w=>palForca(w.p)).filter(Boolean):lacunas(q.enunciado));
 }
 async function salvarProva(novoStatus){
   lerCabecalho();
@@ -559,7 +575,7 @@ async function abrirBancoQuestoes(){
   gs.docs.forEach(d=>{try{const f=JSON.parse(d.data().fonte);(f.questoes||[]).forEach(q=>add(q,f.titulo||"prova"))}catch{}});
   const jaNaProva=new Set(ED.questoes.map(q=>q.tipo+"|"+norm(q.enunciado)));
   const topicos=[...new Set(todas.map(x=>x.q.topico).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
-  const tipoN={mc:"Múltipla escolha",vf:"V ou F",lacuna:"Lacunas"};
+  const tipoN={mc:"Múltipla escolha",vf:"V ou F",lacuna:"Lacunas",memoria:"Jogo da memória",forca:"Jogo da forca"};
   let marcadas=new Set();
   const desenha=()=>{
     const busca=norm($("#bqB")?.value||""),top=$("#bqT")?.value||"",tp=$("#bqTp")?.value||"";
@@ -569,7 +585,7 @@ async function abrirBancoQuestoes(){
     $("#bqC").textContent=`${lista.length} de ${todas.length} questões`;
   };
   dlg.innerHTML=`<div class="bq-h"><div class="row" style="justify-content:space-between;align-items:center"><b>Banco de questões</b><span class="small muted" id="bqC"></span></div>
-    <div class="row"><input type="text" id="bqB" placeholder="Buscar no enunciado" style="flex:2;min-width:200px"><select id="bqT" style="width:auto"><option value="">Todos os tópicos</option>${topicos.map(t=>`<option>${esc(t)}</option>`).join("")}</select><select id="bqTp" style="width:auto"><option value="">Todos os tipos</option><option value="mc">Múltipla escolha</option><option value="vf">V ou F</option><option value="lacuna">Lacunas</option></select></div></div>
+    <div class="row"><input type="text" id="bqB" placeholder="Buscar no enunciado" style="flex:2;min-width:200px"><select id="bqT" style="width:auto"><option value="">Todos os tópicos</option>${topicos.map(t=>`<option>${esc(t)}</option>`).join("")}</select><select id="bqTp" style="width:auto"><option value="">Todos os tipos</option><option value="mc">Múltipla escolha</option><option value="vf">V ou F</option><option value="lacuna">Lacunas</option><option value="memoria">Jogo da memória</option><option value="forca">Jogo da forca</option></select></div></div>
     <div class="bq-l" id="bqL"></div>
     <div class="bq-f"><span><b id="bqN">0</b> selecionada(s)</span><span class="row"><button class="btn" id="bqX">Cancelar</button><button class="btn primary" id="bqOk">Adicionar à prova</button></span></div>`;
   ["bqB","bqT","bqTp"].forEach(id=>$("#"+id).addEventListener("input",desenha));desenha();
@@ -583,6 +599,7 @@ async function abrirBancoQuestoes(){
 }
 
 /* ================= CORREÇÃO ================= */
+function forcaRes(w,tent){const L=new Set(String(tent||"").split("")),erros=[...L].filter(l=>!w.includes(l)).length,venceu=[...w].filter(c=>/[A-Z]/.test(c)).every(c=>L.has(c))&&erros<6;return {venceu,erros,letras:[...L].join("")}}
 function corrigir(prova,gab,resp){
   const R=JSON.parse(resp.respostas||"[]");
   let pts=0,tot=0;const det=prova.questoes.map((q,i)=>{
@@ -590,6 +607,8 @@ function corrigir(prova,gab,resp){
     if(q.tipo==="mc")frac=r===g?1:0;
     if(q.tipo==="vf"){const n=g.length;frac=n?g.filter((v,k)=>(r||[])[k]===v).length/n:0}
     if(q.tipo==="lacuna"){const n=g.length;frac=n?g.filter((acc,k)=>acc.some(a=>norm(a)===norm((r||[])[k]))).length/n:0}
+    if(q.tipo==="memoria"){const f=new Set(((r||{}).f||[]).filter(k=>k>=0&&k<g));frac=g?f.size/g:0}
+    if(q.tipo==="forca"){frac=g.length?g.filter((w,k)=>forcaRes(w,(r||[])[k]).venceu).length/g.length:0}
     if(q.anulada)frac=1;
     tot+=peso;pts+=peso*frac;return {frac,peso,r,g};
   });
@@ -601,13 +620,16 @@ function corrigir(prova,gab,resp){
 let RES=null;
 async function resultados(p){
   SUB=()=>desenharResultados();$("#view").innerHTML=`<p class="muted">Carregando envios…</p>`;
-  const [g,rs]=await Promise.all([db.collection("gabaritos").doc(p.id).get(),db.collection("respostas").where("provaId","==",p.id).get()]);
+  const [g,rs,rasc]=await Promise.all([db.collection("gabaritos").doc(p.id).get(),db.collection("respostas").where("provaId","==",p.id).get(),db.collection("rascunhos").where("provaId","==",p.id).get().catch(()=>({docs:[]}))]);
+  const porUid=new Map(rasc.docs.map(d=>[d.data().uid,d.data()]));
   const prova=PROVAS.find(x=>x.id===p.id)||p,gab=JSON.parse(g.data()?.gabarito||"[]");
   const envios=rs.docs.map(d=>({id:d.id,...d.data()}));
   const t=turma(prova.turmaId),porEmail=new Map(envios.map(e=>[e.email,e]));
   const linhas=(t?.alunos||[]).map(a=>({aluno:a,envio:porEmail.get(a.email)||null}));
   envios.filter(e=>!(t?.emails||[]).includes(e.email)).forEach(e=>linhas.push({aluno:{nome:e.nome||e.email,email:e.email},envio:e,fora:true}));
   linhas.forEach(l=>{if(l.envio)l.c=corrigir(prova,gab,l.envio)});
+  /* atividades em andamento (rascunho salvo na nuvem) */
+  rasc.docs.forEach(d=>{const x=d.data(),l=linhas.find(l=>l.aluno.email===x.email);if(l){if(!l.envio)l.rasc=x}else linhas.push({aluno:{nome:x.nome||x.email,email:x.email},envio:null,rasc:x,fora:true})});
   RES={prova,gab,linhas};desenharResultados();
 }
 function desenharResultados(){
@@ -626,7 +648,7 @@ function desenharResultados(){
     </div>
     <div class="tw"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado em</th><th class="r">Saídas</th><th class="r">Acertos</th><th class="r">Nota</th><th></th></tr></thead><tbody>
     ${linhas.map((l,i)=>`<tr><td>${esc(l.aluno.nome)}<br><span class="small muted">${esc(l.aluno.email)}${l.fora?" · fora da lista da turma":""}</span></td>
-      <td>${l.envio?'<span class="pill aberta">Enviou</span>':'<span class="pill">Pendente</span>'}</td>
+      <td>${l.envio?'<span class="pill aberta">Enviou</span>':l.rasc?`<span class="pill" style="background:var(--warn-bg);border-color:#B9782A">Em andamento</span><br><span class="small muted">${l.rasc.respondidas}/${l.rasc.total} respondidas${l.rasc.salvoEm?" · salvo "+fmtData(l.rasc.salvoEm):""}</span>`:'<span class="pill">Pendente</span>'}</td>
       <td class="small">${l.envio?esc(fmtData(l.envio.enviadoEm)):""}</td>
       <td class="r num">${l.envio?(l.c.oc.saidas||l.c.oc.tent?`${l.c.oc.saidas?`<span style="color:var(--bad);font-weight:700">${l.c.oc.saidas}</span>`:"0"}${l.c.oc.reinicios?`<br><span class="small">${l.c.oc.reinicios} reinício(s)</span>`:""}${l.c.oc.tent?`<br><span class="small" style="color:#B9782A">${l.c.oc.tent} tentativa(s)</span>`:""}`:"0"):""}</td>
       <td class="r num">${l.envio?`${l.c.acertos}/${prova.questoes.length}`:""}</td>
@@ -651,6 +673,8 @@ function corrigidaHTML(l){
       if(q.tipo==="mc")corpo=q.alternativas.map((a,k)=>`<div class="ca ${k===d.g?"correta":k===d.r?"marcada-errada":""}">${LETRAS[k]}) ${rico(a)} ${k===d.r?"<b>← marcada</b>":""}${k===d.g?" <b>✓ correta</b>":""}</div>`).join("")+(d.r<0||d.r==null?'<div class="ca marcada-errada">Sem resposta</div>':"");
       if(q.tipo==="vf")corpo=q.afirmacoes.map((a,k)=>{const r=(d.r||[])[k]||"–",ok=r===d.g[k];return `<div class="ca ${ok?"correta":"marcada-errada"}">${k+1}. ${rico(a)}<br><span class="small">Resposta: <b>${r==="V"?"Verdadeiro":r==="F"?"Falso":"sem resposta"}</b> · Gabarito: <b>${d.g[k]==="V"?"Verdadeiro":"Falso"}</b></span></div>`}).join("");
       if(q.tipo==="lacuna")corpo=d.g.map((acc,k)=>{const r=(d.r||[])[k]||"",ok=acc.some(a=>norm(a)===norm(r));return `<div class="ca ${ok?"correta":"marcada-errada"}">Lacuna ${k+1}: <b>${esc(r||"sem resposta")}</b> · Aceitas: ${esc(acc.join(" / "))}</div>`}).join("");
+      if(q.tipo==="memoria"){const f=(d.r||{}).f||[];corpo=`<div class="ca ${f.length===d.g?"correta":"marcada-errada"}">Pares encontrados: <b>${f.length} de ${d.g}</b> · jogadas: ${(d.r||{}).j||0}</div>`+(q.pares||[]).map((p,k)=>`<div class="ca ${f.includes(k)?"correta":"marcada-errada"}">${esc(p.t)} ${f.includes(k)?"✓":"✗"}</div>`).join("")}
+      if(q.tipo==="forca")corpo=d.g.map((w,k)=>{const x=forcaRes(w,(d.r||[])[k]);return `<div class="ca ${x.venceu?"correta":"marcada-errada"}">Palavra ${k+1}: <b>${esc(w)}</b> · ${x.venceu?"descobriu":"não descobriu"} · letras tentadas: ${esc(x.letras||"nenhuma")} · erros: ${x.erros}</div>`}).join("");
       const enun=q.tipo==="lacuna"?rico(q.enunciado).replace(/\{\{#\}\}/g,"_____"):rico(q.enunciado);
       return `<div class="cq ${cls}"><div class="cq-h"><span>Questão ${i+1}${q.topico?` · <span class="muted">${esc(q.topico)}</span>`:""}</span><span>${q.anulada?"Anulada":d.frac===1?"Certa":d.frac===0?"Errada":`Parcial (${Math.round(d.frac*100)}%)`}</span></div>
         ${q.imagem?`<div class="fig"><img src="${svgSrc(q.imagem)}" alt="${esc(altSvg(q.imagem))}"></div>`:""}<p style="margin:0 0 6px">${enun}</p>${q.codigo?`<pre class="code">${esc(q.codigo)}</pre>`:""}${corpo}</div>`}).join("")}`;
@@ -668,7 +692,7 @@ function verAluno(i){
   $("#aPdf").onclick=()=>pdfProvas([l],`${RES.prova.titulo} - ${l.aluno.nome}`);
   $("#aRefazer").onclick=async()=>{
     if(!confirm(`Apagar o envio de ${l.aluno.nome}? O aluno poderá fazer a prova de novo (se ela estiver aberta). Baixe o PDF antes, se quiser guardar.`))return;
-    await Promise.all([db.collection("respostas").doc(l.envio.id).delete(),db.collection("recibos").doc(l.envio.id).delete()]);
+    await Promise.all([db.collection("respostas").doc(l.envio.id).delete(),db.collection("recibos").doc(l.envio.id).delete(),db.collection("rascunhos").doc(l.envio.id).delete().catch(()=>{})]);
     toast("Envio apagado");resultados(RES.prova);
   };
 }
@@ -679,7 +703,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#show").hidden)
 function exportarNotas(){
   const {prova,linhas}=RES;
   const head=["Aluno","E-mail","Situação","Enviado em",...prova.questoes.map((_,i)=>`Q${i+1}`),"Saídas","Reinícios","Tentativas bloqueadas","Acertos","Nota"];
-  const rows=linhas.map(l=>[l.aluno.nome,l.aluno.email,l.envio?"Enviou":"Pendente",l.envio?fmtData(l.envio.enviadoEm):"",...prova.questoes.map((_,i)=>l.envio?Math.round(l.c.det[i].frac*100)/100:""),l.envio?l.c.oc.saidas:"",l.envio?l.c.oc.reinicios:"",l.envio?l.c.oc.tent:"",l.envio?l.c.acertos:"",l.envio?Math.round(l.c.nota*100)/100:""]);
+  const rows=linhas.map(l=>[l.aluno.nome,l.aluno.email,l.envio?"Enviou":l.rasc?`Em andamento (${l.rasc.respondidas}/${l.rasc.total})`:"Pendente",l.envio?fmtData(l.envio.enviadoEm):"",...prova.questoes.map((_,i)=>l.envio?Math.round(l.c.det[i].frac*100)/100:""),l.envio?l.c.oc.saidas:"",l.envio?l.c.oc.reinicios:"",l.envio?l.c.oc.tent:"",l.envio?l.c.acertos:"",l.envio?Math.round(l.c.nota*100)/100:""]);
   const ws=XLSX.utils.aoa_to_sheet([[`${prova.titulo} · ${prova.turmaNome} · ${prova.disciplinaNome}`],[],head,...rows]);
   ws["!cols"]=[{wch:32},{wch:34},{wch:10},{wch:16},...prova.questoes.map(()=>({wch:6})),{wch:9},{wch:8}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Notas");
@@ -712,6 +736,8 @@ async function pdfProvas(lista,nome){
       if(q.tipo==="mc"){q.alternativas.forEach((a,k)=>txt(`${k===d.r?"[X]":"[ ]"} ${LETRAS[k]}) ${a}${k===d.g?"   <- correta":""}`,{ind:10,bold:k===d.g,cor:k===d.r&&k!==d.g?[166,58,50]:k===d.g?[47,122,74]:[27,36,48]}));if(d.r<0||d.r==null)txt("Sem resposta",{ind:10,cor:[166,58,50]})}
       if(q.tipo==="vf")q.afirmacoes.forEach((a,k)=>{const r=(d.r||[])[k]||"-";txt(`${k+1}. ${a}  | resposta: ${r} | gabarito: ${d.g[k]}`,{ind:10,cor:r===d.g[k]?[47,122,74]:[166,58,50]})});
       if(q.tipo==="lacuna")d.g.forEach((acc,k)=>{const r=(d.r||[])[k]||"";const ok=acc.some(a=>norm(a)===norm(r));txt(`Lacuna ${k+1}: ${r||"sem resposta"}  | aceitas: ${acc.join(" / ")}`,{ind:10,cor:ok?[47,122,74]:[166,58,50]})});
+      if(q.tipo==="memoria"){const f=(d.r||{}).f||[];txt(`Pares encontrados: ${f.length} de ${d.g} | jogadas: ${(d.r||{}).j||0}`,{ind:10,cor:f.length===d.g?[47,122,74]:[166,58,50]})}
+      if(q.tipo==="forca")d.g.forEach((w,k)=>{const x=forcaRes(w,(d.r||[])[k]);txt(`Palavra ${k+1}: ${w} | ${x.venceu?"descobriu":"não descobriu"} | letras: ${x.letras||"-"} | erros: ${x.erros}`,{ind:10,cor:x.venceu?[47,122,74]:[166,58,50]})});
       y+=6;
     });
   });

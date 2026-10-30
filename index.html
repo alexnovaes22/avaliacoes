@@ -30,6 +30,16 @@ html{scroll-padding-top:20px}
 body.travado .wrap,body.travado .bar{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body.travado input,body.travado textarea{-webkit-user-select:text;user-select:text}
 @media print{body{display:none!important}}
+.mem{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.carta{all:unset;box-sizing:border-box;cursor:pointer;aspect-ratio:1/1;border-radius:10px;border:2px solid var(--line);background:var(--accent);display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;font-weight:700;color:var(--ink);transition:transform .15s}
+.carta .verso{font-size:2rem;color:#fff}.carta.aberta{background:var(--surface);border-color:var(--accent)}.carta.ok{background:var(--ok-bg,#e3f1e6);border-color:var(--ok);cursor:default}
+.carta:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.carta img{max-width:100%;max-height:100%}.carta .emo{font-size:2.6rem}.carta .ct{font-size:.95rem;line-height:1.2}
+.forca{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}.forca-h{display:flex;gap:14px;align-items:center}
+.palavra{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;font-family:var(--mono,monospace);font-size:1.4rem;font-weight:700}.palavra .ltr{min-width:1.1em;border-bottom:3px solid var(--ink);text-align:center}.palavra .esp{min-width:.6em}
+.teclado{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.teclado button{all:unset;cursor:pointer;width:34px;height:36px;border:1px solid var(--line);border-radius:6px;text-align:center;line-height:36px;font-weight:700;background:var(--surface)}
+.teclado button:disabled{cursor:default;opacity:.6}.teclado button.certo{background:#d8eedd}.teclado button.errado{background:#f3d9d6}.teclado button:focus-visible{outline:3px solid var(--accent)}
+.nuvem{display:flex;align-items:center;gap:8px;margin-right:auto}
+@media (max-width:560px){.nuvem .small{display:none}.bar-in{flex-wrap:wrap}.bar-in .prog{flex-basis:100%;order:-1}.bar-in .btn{flex:1}.nuvem{flex:1}.nuvem .btn{width:100%}}
 .aviso-bloq{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;padding:8px 16px;border-radius:999px;font-weight:700;z-index:99;font-size:.9rem}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
 button,input{font:inherit;color:inherit}
@@ -102,6 +112,7 @@ dialog::backdrop{background:rgba(10,15,20,.5)}
 <div class="bar" id="bar" hidden>
   <div class="bar-in">
     <div class="prog"><div class="txt" id="progTxt"></div><div class="track"><div class="fill" id="progFill"></div></div></div>
+    <span class="nuvem" id="nuvemBox" hidden><button class="btn" id="bSalvarN">Salvar</button><span class="small muted" id="nuvemSt" aria-live="polite"></span></span>
     <button class="btn" id="bAnt">Anterior</button>
     <button class="btn primary" id="bProx">Próxima</button>
   </div>
@@ -147,9 +158,27 @@ function ordem(seed){const R=rng(seed);return PROVA.questoes.map(q=>{const n=q.t
 
 /* ---------- rascunho local ---------- */
 const chave=()=>`prova_${PROVA_ID}_${USER.uid}`;
-function novoEstado(){return {seed:Math.floor(Math.random()*2147483647),inicio:Date.now(),saidas:0,log:[],reinicios:0,emAndamento:false,resp:PROVA.questoes.map(q=>q.tipo==="mc"?-1:q.tipo==="vf"?q.afirmacoes.map(()=>""):Array((q.enunciado.match(/\{\{#\}\}/g)||[]).length).fill(""))}}
+function novoEstado(){return {seed:Math.floor(Math.random()*2147483647),inicio:Date.now(),saidas:0,log:[],reinicios:0,emAndamento:false,resp:PROVA.questoes.map(q=>q.tipo==="mc"?-1:q.tipo==="vf"?q.afirmacoes.map(()=>""):q.tipo==="memoria"?{f:[],j:0}:q.tipo==="forca"?q.palavras.map(()=>""):Array((q.enunciado.match(/\{\{#\}\}/g)||[]).length).fill(""))}}
 function carregar(){try{const s=JSON.parse(localStorage.getItem(chave()));if(s&&Array.isArray(s.resp)&&s.resp.length===PROVA.questoes.length)return s}catch{}return novoEstado()}
-function salvar(){try{localStorage.setItem(chave(),JSON.stringify({...ST,tela:TELA}))}catch{}}
+function salvar(){if(!ST)return;ST.salvoLocal=Date.now();try{localStorage.setItem(chave(),JSON.stringify({...ST,tela:TELA}))}catch{}agendarNuvem()}
+/* ---------- rascunho na nuvem (atividades): continuar depois, em qualquer aparelho ---------- */
+const NUVEM=()=>!!(PROVA&&!PREVIEW&&PROVA.tipoAval==="Atividade");
+const rascRef=()=>db.collection("rascunhos").doc(`${PROVA_ID}_${USER.uid}`);
+let nuvemT=null,nuvemSujo=false,nuvemOk=null;
+function agendarNuvem(){if(!NUVEM())return;nuvemSujo=true;clearTimeout(nuvemT);nuvemT=setTimeout(()=>salvarNuvem(),6000);nuvemStatus()}
+async function salvarNuvem(manual){
+  if(!NUVEM()||ENVIANDO||!ST)return;clearTimeout(nuvemT);
+  if(!nuvemSujo&&!manual)return;
+  const est=document.getElementById("nuvemSt");if(est)est.textContent="Salvando…";
+  try{await rascRef().set({provaId:PROVA_ID,uid:USER.uid,nome:USER.displayName||USER.email,email:(USER.email||"").toLowerCase(),estado:JSON.stringify({...ST,tela:TELA}),respondidas:PROVA.questoes.filter((_,k)=>respondida(k)).length,total:N(),salvoEm:firebase.firestore.FieldValue.serverTimestamp()});
+    nuvemSujo=false;nuvemOk=new Date();if(manual)avisoNuvem(`Salvo! Você pode sair e continuar depois, até em outro aparelho.`)}
+  catch(e){nuvemOk=null;if(manual)avisoNuvem("Não foi possível salvar na nuvem agora. Confira a internet e tente de novo.",true)}
+  nuvemStatus();
+}
+function nuvemStatus(){const el=document.getElementById("nuvemSt");if(!el)return;el.textContent=nuvemSujo?"Alterações ainda não salvas":nuvemOk?`Salvo às ${nuvemOk.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`:""}
+function avisoNuvem(msg,erro){const el=document.querySelector(".aviso-bloq")||document.body.appendChild(Object.assign(document.createElement("div"),{className:"aviso-bloq"}));el.textContent=msg;el.style.background=erro?"var(--bad)":"var(--ok)";clearTimeout(el._t);el._t=setTimeout(()=>el.remove(),3200)}
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&nuvemSujo)salvarNuvem()});
+window.addEventListener("pagehide",()=>{if(nuvemSujo)salvarNuvem()});
 
 /* ---------- modo anticola: tela cheia + vigilância de saídas ---------- */
 let pausado=false,fsAtivo=false,ultimaViol=0,MSG_REINICIO=false;
@@ -232,7 +261,7 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("keyup",e=>{if(PROVA&&e.key==="PrintScreen")tentativa("capturar a tela")},true);
 window.addEventListener("blur",()=>setTimeout(()=>{if(!document.hasFocus())violacao("trocou de janela ou programa")},1200));
 ["fullscreenchange","webkitfullscreenchange"].forEach(ev=>document.addEventListener(ev,()=>{if(!fsEl()&&fsAtivo){fsAtivo=false;violacao("saiu da tela cheia")}}));
-function respondida(i){const q=PROVA.questoes[i],r=ST.resp[i];if(q.tipo==="mc")return r>=0;if(q.tipo==="vf")return r.every(x=>x);return r.every(x=>String(x).trim())}
+function respondida(i){const q=PROVA.questoes[i],r=ST.resp[i];if(q.tipo==="mc")return r>=0;if(q.tipo==="vf")return r.every(x=>x);if(q.tipo==="memoria")return r.f.length===q.pares.length;if(q.tipo==="forca")return q.palavras.every((w,k)=>forcaEstado(w,r[k]).fim);return r.every(x=>String(x).trim())}
 
 /* ---------- início ---------- */
 async function iniciar(){
@@ -285,7 +314,9 @@ async function abrir(){
       <p><button class="btn" id="bSair">Sair da conta</button></p></div>`);
     $("#bSair").onclick=sair;return;
   }
-  ST=carregar();ORDEM=ordem(ST.seed);QORD=qordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
+  ST=carregar();
+  if(NUVEM()){try{const r=await rascRef().get();if(r.exists){const n=JSON.parse(r.data().estado||"null");if(n&&Array.isArray(n.resp)&&n.resp.length===PROVA.questoes.length&&(n.salvoLocal||0)>(ST.salvoLocal||0)){ST=n;setTimeout(()=>avisoNuvem("Continuando de onde você parou."),400)}nuvemOk=r.data().salvoEm?.toDate?.()||null}}catch{}}
+  ORDEM=ordem(ST.seed);QORD=qordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
   if(ST.avisoReinicio){MSG_REINICIO=true;ST.avisoReinicio=false;TELA=0;salvar()}
   iniciarRelogio();
   document.title=PROVA.titulo;document.body.classList.add("travado");
@@ -317,7 +348,7 @@ function mostrar(i){
   if(TELA===0){
     corpo=`<section class="card"><h2>Antes de começar</h2>
       ${PROVA.instrucoes?`<p style="white-space:pre-line">${esc(PROVA.instrucoes)}</p>`:""}
-      <p>São ${N()} questões. Suas respostas ficam salvas neste navegador enquanto você responde.</p>
+      <p>São ${N()} questões. ${NUVEM()?`<b>Suas respostas são salvas na nuvem:</b> você pode parar, sair e continuar depois, até em outro aparelho (celular ou computador), entrando com a mesma conta. O sistema salva sozinho, mas use o botão <b>Salvar</b> sempre que for parar.`:"Suas respostas ficam salvas neste navegador enquanto você responde."}</p>
       <p><b>Você só pode enviar uma vez.</b> Depois do envio, não é possível alterar as respostas.</p>
       ${PROVA.vigiar?`<div class="alert"><b>${tu()} em tela cheia.</b> Ao clicar em Começar, a ${tl()} ocupa a tela toda. Sair da tela cheia, trocar de aba, abrir outra janela ou fechar a página ${PROVA.saidasPermitidas?`gera um aviso. Depois de ${PROVA.saidasPermitidas} aviso(s), a ${tl()} é encerrada, suas respostas são apagadas e você volta para a tela de login para recomeçar do zero.`:`<b>encerra a ${tl()}</b>: suas respostas são apagadas e você volta para a tela de login para recomeçar do zero.`}</div>`:""}</section>`;
     if(MSG_REINICIO){corpo=`<div class="alert" style="border-color:var(--bad)"><b>A ${tl()} foi reiniciada</b> porque você saiu da tela. Suas respostas anteriores foram apagadas.</div>`+corpo;MSG_REINICIO=false}
@@ -371,6 +402,48 @@ function questao(qi,pos){
       row.append(t,seg);vf.appendChild(row);
     });box.appendChild(vf);
   }
+  if(q.tipo==="memoria")jogoMemoria(q,qi,box);
+  if(q.tipo==="forca")jogoForca(q,qi,box);
+}
+/* ---------- jogo da memória ---------- */
+const imgOuEmoji=v=>/^\s*<svg[\s>]/i.test(v||"")?`<img alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(v)}">`:`<span class="emo">${esc(v||"")}</span>`;
+let MEM_ABERTAS=[],MEM_TRAVA=false;
+function jogoMemoria(q,qi,box){
+  const r=ST.resp[qi],R=rng((ST.seed^((qi+1)*2654435761))>>>0),cartas=q.pares.flatMap((p,k)=>[{k,lado:"t"},{k,lado:"i"}]);
+  for(let i=cartas.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[cartas[i],cartas[j]]=[cartas[j],cartas[i]]}
+  const wrap=document.createElement("div");box.appendChild(wrap);
+  const desenha=()=>{
+    wrap.innerHTML=`<p class="small muted" style="margin:0 0 8px">Pares encontrados: <b>${r.f.length} de ${q.pares.length}</b> · jogadas: ${r.j}${r.f.length===q.pares.length?' · <b style="color:var(--ok)">Concluído!</b>':""}</p>
+      <div class="mem" role="grid">${cartas.map((c,ci)=>{const ok=r.f.includes(c.k),ab=ok||MEM_ABERTAS.includes(ci);const p=q.pares[c.k];
+        return `<button class="carta ${ab?"aberta":""} ${ok?"ok":""}" data-ci="${ci}" aria-label="${ab?(c.lado==="t"?esc(p.t):"imagem"):"carta virada"}" ${ok?"disabled":""}>${ab?(c.lado==="t"?`<span class="ct">${esc(p.t)}</span>`:imgOuEmoji(p.img)):'<span class="verso">?</span>'}</button>`}).join("")}</div>`;
+    wrap.querySelectorAll("[data-ci]").forEach(b=>b.onclick=()=>{
+      const ci=+b.dataset.ci;if(MEM_TRAVA||MEM_ABERTAS.includes(ci)||r.f.includes(cartas[ci].k))return;
+      MEM_ABERTAS.push(ci);
+      if(MEM_ABERTAS.length===2){const [a,b2]=MEM_ABERTAS.map(x=>cartas[x]);r.j++;
+        if(a.k===b2.k&&a.lado!==b2.lado){r.f.push(a.k);MEM_ABERTAS=[];salvar();montarNav();barra();desenha();return}
+        MEM_TRAVA=true;desenha();setTimeout(()=>{MEM_ABERTAS=[];MEM_TRAVA=false;salvar();desenha()},950);return}
+      desenha();
+    });
+  };
+  MEM_ABERTAS=[];MEM_TRAVA=false;desenha();
+}
+/* ---------- jogo da forca ---------- */
+const FORCA_MAX=6;
+const desofusca=c=>{try{return [...atob(c)].map((ch,i)=>String.fromCharCode(ch.charCodeAt(0)^(73+i%7))).join("")}catch{return ""}};
+function forcaEstado(w,tent){const pal=desofusca(w.cod),letras=new Set(String(tent||"").split("")),erros=[...letras].filter(l=>!pal.includes(l)).length,venceu=[...pal].filter(ch=>/[A-Z]/.test(ch)).every(ch=>letras.has(ch));return {pal,letras,erros,venceu,perdeu:!venceu&&erros>=FORCA_MAX,fim:venceu||erros>=FORCA_MAX}}
+function bonecoForca(e){const p=[`<circle cx="70" cy="34" r="10"/>`,`<line x1="70" y1="44" x2="70" y2="74"/>`,`<line x1="70" y1="52" x2="56" y2="64"/>`,`<line x1="70" y1="52" x2="84" y2="64"/>`,`<line x1="70" y1="74" x2="58" y2="92"/>`,`<line x1="70" y1="74" x2="82" y2="92"/>`];
+  return `<svg viewBox="0 0 110 110" width="96" height="96" aria-label="${e} de ${FORCA_MAX} erros" role="img" style="stroke:var(--ink);stroke-width:3;fill:none;stroke-linecap:round"><line x1="10" y1="104" x2="60" y2="104"/><line x1="25" y1="104" x2="25" y2="8"/><line x1="25" y1="8" x2="70" y2="8"/><line x1="70" y1="8" x2="70" y2="24"/>${p.slice(0,e).join("")}</svg>`}
+function jogoForca(q,qi,box){
+  const r=ST.resp[qi],wrap=document.createElement("div");box.appendChild(wrap);
+  const desenha=()=>{
+    wrap.innerHTML=q.palavras.map((w,k)=>{const E=forcaEstado(w,r[k]);
+      return `<div class="forca"><div class="forca-h">${bonecoForca(E.erros)}<div><div class="small muted">Palavra ${k+1} de ${q.palavras.length} · erros ${E.erros}/${FORCA_MAX}</div><div class="dica"><b>Dica:</b> ${esc(w.dica)}</div>
+        <div class="palavra" aria-label="Palavra">${[...E.pal].map(ch=>/[A-Z]/.test(ch)?`<span class="ltr">${E.letras.has(ch)||E.perdeu?`<span style="${!E.letras.has(ch)?"color:var(--bad)":""}">${ch}</span>`:"&nbsp;"}</span>`:`<span class="esp">${ch===" "?"&nbsp;":esc(ch)}</span>`).join("")}</div>
+        ${E.venceu?'<div class="small" style="color:var(--ok);font-weight:700">Você acertou!</div>':E.perdeu?'<div class="small" style="color:var(--bad);font-weight:700">Não foi desta vez. A palavra aparece em vermelho.</div>':""}</div></div>
+        ${E.fim?"":`<div class="teclado">${"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l=>`<button data-fk="${k}" data-l="${l}" ${E.letras.has(l)?"disabled":""} class="${E.letras.has(l)?(E.pal.includes(l)?"certo":"errado"):""}">${l}</button>`).join("")}</div>`}</div>`}).join("");
+    wrap.querySelectorAll("[data-fk]").forEach(b=>b.onclick=()=>{const k=+b.dataset.fk;r[k]=(r[k]||"")+b.dataset.l;salvar();montarNav();barra();desenha()});
+  };
+  desenha();
 }
 function montarNav(){
   const nav=$("#nav");if(!nav)return;nav.innerHTML="";
@@ -382,10 +455,11 @@ function montarNav(){
 function barra(){
   $("#bar").hidden=false;const n=PROVA.questoes.filter((_,k)=>respondida(k)).length;
   $("#progTxt").textContent=`${n} de ${N()} respondidas`;$("#progFill").style.width=(n/N()*100)+"%";
-  $("#bAnt").disabled=TELA===0;$("#bProx").hidden=TELA===ULT();
+  $("#bAnt").disabled=TELA===0;$("#bProx").hidden=TELA===ULT();$("#nuvemBox").hidden=!NUVEM();nuvemStatus();
   $("#bProx").textContent=TELA===0?"Começar":TELA===N()?"Revisar":"Próxima";
 }
 $("#bAnt").onclick=()=>irPara(TELA-1);
+$("#bSalvarN").onclick=()=>salvarNuvem(true);
 $("#bProx").onclick=()=>irPara(TELA+1);
 
 /* ---------- relógio: a prova fecha sozinha no horário definido pelo professor ---------- */
@@ -418,7 +492,7 @@ async function enviar(auto){
   const batch=db.batch();
   batch.set(db.collection("respostas").doc(id),{provaId:PROVA_ID,turmaId:PROVA.turmaId,uid:USER.uid,email:(USER.email||"").toLowerCase(),nome:USER.displayName||"",seed:ST.seed,respostas:JSON.stringify(resp),ocorrencias:JSON.stringify({log:(ST.log||[]).slice(-60),reinicios:ST.reinicios||0}),inicioEm:ST.inicio,enviadoEm:ts});
   batch.set(db.collection("recibos").doc(id),{uid:USER.uid,provaId:PROVA_ID,enviadoEm:ts});
-  try{await batch.commit();ST.emAndamento=false;localStorage.removeItem(chave());sairTelaCheia();pararRelogio();enviada(firebase.firestore.Timestamp.now(),auto)}
+  try{await batch.commit();ST.emAndamento=false;localStorage.removeItem(chave());clearTimeout(nuvemT);nuvemSujo=false;if(NUVEM())rascRef().delete().catch(()=>{});sairTelaCheia();pararRelogio();enviada(firebase.firestore.Timestamp.now(),auto)}
   catch(e){
     ENVIANDO=false;b.disabled=false;b.textContent=`Enviar ${tl()}`;pausado=false;if(auto){sairTelaCheia();mostrar(ULT())}
     const msg=e.code==="permission-denied"?"O envio foi recusado. Ela pode ter sido encerrada ou já foi enviada antes. Suas respostas continuam salvas neste navegador: mostre esta tela ao professor.":"Não consegui enviar. Verifique a internet e tente de novo. Suas respostas continuam salvas.";
