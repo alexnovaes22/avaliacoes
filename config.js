@@ -10,5 +10,5 @@ window.FIREBASE_CONFIG = {
 };
 /* E-mails do professor: os únicos com acesso ao painel, gabaritos e respostas.
    >>> TROQUE "SEU.GMAIL.AQUI@gmail.com" PELO SEU GMAIL PESSOAL (o mesmo endereço também no firestore.rules) <<< */
-window.PROFESSOR_EMAILS = ["alex.novaes@escola.pr.gov.br", "SEU.GMAIL.AQUI@gmail.com"];
+window.PROFESSOR_EMAILS = ["alex.novaes@escola.pr.gov.br", "novaes1219@gmail.com"];
 window.PROFESSOR_EMAIL = window.PROFESSOR_EMAILS[0];
