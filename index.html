@@ -157,13 +157,13 @@ function qordem(seed){const R=rng(seed^0x5bd1e995),a=[...PROVA.questoes.keys()];
 function ordem(seed){const R=rng(seed);return PROVA.questoes.map(q=>{const n=q.tipo==="mc"?q.alternativas.length:0;const a=[...Array(n).keys()];if(PROVA.embaralhar)for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a})}
 
 /* ---------- rascunho local ---------- */
-const chave=()=>`prova_${PROVA_ID}_${USER.uid}`;
+const chave=()=>`prova_${PROVA_ID}_${USER.idAluno}`;
 function novoEstado(){return {seed:Math.floor(Math.random()*2147483647),inicio:Date.now(),saidas:0,log:[],reinicios:0,emAndamento:false,resp:PROVA.questoes.map(q=>q.tipo==="mc"?-1:q.tipo==="vf"?q.afirmacoes.map(()=>""):q.tipo==="memoria"?{f:[],j:0}:q.tipo==="forca"?q.palavras.map(()=>""):Array((q.enunciado.match(/\{\{#\}\}/g)||[]).length).fill(""))}}
 function carregar(){try{const s=JSON.parse(localStorage.getItem(chave()));if(s&&Array.isArray(s.resp)&&s.resp.length===PROVA.questoes.length)return s}catch{}return novoEstado()}
 function salvar(){if(!ST)return;ST.salvoLocal=Date.now();try{localStorage.setItem(chave(),JSON.stringify({...ST,tela:TELA}))}catch{}agendarNuvem()}
 /* ---------- rascunho na nuvem (atividades): continuar depois, em qualquer aparelho ---------- */
 const NUVEM=()=>!!(PROVA&&!PREVIEW&&PROVA.tipoAval==="Atividade");
-const rascRef=()=>db.collection("rascunhos").doc(`${PROVA_ID}_${USER.uid}`);
+const rascRef=()=>db.collection("rascunhos").doc(`${PROVA_ID}_${USER.idAluno}`);
 let nuvemT=null,nuvemSujo=false,nuvemOk=null;
 function agendarNuvem(){if(!NUVEM())return;nuvemSujo=true;clearTimeout(nuvemT);nuvemT=setTimeout(()=>salvarNuvem(),6000);nuvemStatus()}
 async function salvarNuvem(manual){
@@ -269,16 +269,48 @@ async function iniciar(){
   firebase.initializeApp(FIREBASE_CONFIG);auth=firebase.auth();db=firebase.firestore();
   await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
   if(!PROVA_ID){tela(`<div class="card"><h1>Link incompleto</h1><p>Abra a prova pelo link enviado pelo professor.</p></div>`);return}
-  auth.onAuthStateChanged(u=>{USER=u;u?abrir():telaLogin()});
+  auth.onAuthStateChanged(async u=>{
+    if(!u){USER=null;if(!LOGANDO)telaLogin();return}
+    if(u.isAnonymous){
+      if(LOGANDO)return;
+      let s=null;try{s=await db.collection("sessoes").doc(u.uid).get()}catch{}
+      if(!s||!s.exists){await sair();return}
+      USER=usuarioDeSessao(u,s.data());
+    }else USER={uid:u.uid,email:u.email,displayName:u.displayName,idAluno:u.uid};
+    abrir();
+  });
 }
+/* ---------- entrada por código de acesso individual (sem conta Google) ---------- */
+let LOGANDO=false;
+const usuarioDeSessao=(u,s)=>({uid:u.uid,email:s.aluno,displayName:s.nome,idAluno:s.codigo,anon:true});
+const normCodigo=c=>String(c||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
 function telaLogin(msg){msg=msg||LOGIN_MSG;LOGIN_MSG="";
   tela(`<div class="card center">
     <h1>Avaliação</h1>
-    <p>Entre com a sua conta Google da escola para começar.</p>
     ${msg?`<div class="alert">${esc(msg)}</div>`:""}
-    <p><button class="btn primary" id="bGoogle">Entrar com Google</button></p>
-    <p class="small muted">Use o e-mail institucional cadastrado pelo professor.</p></div>`);
+    <form id="fCod" autocomplete="off" style="max-width:340px;margin:0 auto">
+      <label for="iCod" style="display:block;font-weight:700;margin-bottom:6px">Digite o seu código de acesso</label>
+      <input id="iCod" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="Ex.: K7PQ3M" style="width:100%;box-sizing:border-box;font-size:1.6rem;letter-spacing:.2em;text-align:center;text-transform:uppercase;padding:10px;border:2px solid var(--line);border-radius:10px;font-family:monospace">
+      <p class="small muted" style="margin:6px 0 12px">É o código da tirinha que o professor entregou. Ele é só seu: não passe para ninguém.</p>
+      <button class="btn primary" type="submit" id="bCod" style="width:100%">Entrar</button>
+    </form>
+    <p class="small muted" style="margin-top:22px">Tem conta Google liberada pelo professor? <button class="btn sm" id="bGoogle" type="button">Entrar com Google</button></p></div>`);
   $("#bGoogle").onclick=entrar;
+  $("#fCod").onsubmit=e=>{e.preventDefault();entrarCodigo($("#iCod").value)};
+  setTimeout(()=>$("#iCod")?.focus(),50);
+}
+async function entrarCodigo(valor){
+  const codigo=normCodigo(valor),b=$("#bCod");
+  if(codigo.length<5){telaLogin("Digite o código completo, como está na tirinha.");return}
+  b.disabled=true;b.textContent="Entrando…";LOGANDO=true;
+  try{
+    const cred=await auth.signInAnonymously(),u=cred.user;
+    const a=await db.collection("acessos").doc(codigo).get();
+    if(!a.exists){LOGANDO=false;await auth.signOut().catch(()=>{});telaLogin("Código não encontrado. Confira as letras e os números (não existe a letra O nem o número 0, nem I e 1).");return}
+    const d=a.data(),ses={codigo,turmaId:d.turmaId,aluno:d.aluno,nome:d.nome,criadoEm:firebase.firestore.FieldValue.serverTimestamp()};
+    await db.collection("sessoes").doc(u.uid).set(ses);
+    USER=usuarioDeSessao(u,ses);LOGANDO=false;abrir();
+  }catch(e){LOGANDO=false;await auth.signOut().catch(()=>{});telaLogin(e&&e.code==="auth/operation-not-allowed"?"A entrada por código ainda não foi ativada pelo professor.":"Não foi possível entrar agora. Confira a internet e tente de novo.")}
 }
 async function entrar(){
   const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
@@ -296,7 +328,7 @@ async function abrir(){
   PREVIEW=(window.PROFESSOR_EMAILS||[PROFESSOR_EMAIL]).map(e=>String(e).toLowerCase()).includes((USER.email||"").toLowerCase());
   $("#preview").hidden=!PREVIEW;
   if(!PREVIEW){
-    try{const r=await db.collection("recibos").doc(`${PROVA_ID}_${USER.uid}`).get();if(r.exists){try{const d=await db.collection("provas").doc(PROVA_ID).get();if(d.exists)PROVA=d.data()}catch{}enviada(r.data().enviadoEm);return}}catch{}
+    try{const r=await db.collection("recibos").doc(`${PROVA_ID}_${USER.idAluno}`).get();if(r.exists){try{const d=await db.collection("provas").doc(PROVA_ID).get();if(d.exists)PROVA=d.data()}catch{}enviada(r.data().enviadoEm);return}}catch{}
   }
   try{const d=await db.collection("provas").doc(PROVA_ID).get();if(!d.exists)throw{code:"not-found"};PROVA=d.data()}
   catch(e){
@@ -487,7 +519,7 @@ async function enviar(auto){
   if(!ok)return;
   ENVIANDO=true;const b=$("#bEnviar")||document.createElement("button");b.disabled=true;b.textContent="Enviando…";pausado=true;
   if(auto)tela(`<div class="card center"><h1>Tempo esgotado</h1><p>Enviando suas respostas automaticamente…</p></div>`);
-  const id=`${PROVA_ID}_${USER.uid}`,ts=firebase.firestore.FieldValue.serverTimestamp();
+  const id=`${PROVA_ID}_${USER.idAluno}`,ts=firebase.firestore.FieldValue.serverTimestamp();
   const resp=ST.resp.map(r=>Array.isArray(r)?r.map(x=>String(x).slice(0,200)):r);
   const batch=db.batch();
   batch.set(db.collection("respostas").doc(id),{provaId:PROVA_ID,turmaId:PROVA.turmaId,uid:USER.uid,email:(USER.email||"").toLowerCase(),nome:USER.displayName||"",seed:ST.seed,respostas:JSON.stringify(resp),ocorrencias:JSON.stringify({log:(ST.log||[]).slice(-60),reinicios:ST.reinicios||0}),inicioEm:ST.inicio,enviadoEm:ts});
