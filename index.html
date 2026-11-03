@@ -294,7 +294,9 @@ function telaLogin(msg){msg=msg||LOGIN_MSG;LOGIN_MSG="";
       <p class="small muted" style="margin:6px 0 12px">É o código da tirinha que o professor entregou. Ele é só seu: não passe para ninguém.</p>
       <button class="btn primary" type="submit" id="bCod" style="width:100%">Entrar</button>
     </form>
-    <p class="small muted" style="margin-top:22px">Tem conta Google liberada pelo professor? <button class="btn sm" id="bGoogle" type="button">Entrar com Google</button></p></div>`);
+    <div style="display:flex;align-items:center;gap:10px;max-width:340px;margin:20px auto 12px;color:var(--muted)"><span style="flex:1;border-top:1px solid var(--line)"></span>ou<span style="flex:1;border-top:1px solid var(--line)"></span></div>
+    <p><button class="btn" id="bGoogle" type="button" style="width:100%;max-width:340px">Entrar com conta Google</button></p>
+    <p class="small muted">Conta da escola ou conta Google pessoal, conforme o professor orientar.</p></div>`);
   $("#bGoogle").onclick=entrar;
   $("#fCod").onsubmit=e=>{e.preventDefault();entrarCodigo($("#iCod").value)};
   setTimeout(()=>$("#iCod")?.focus(),50);
@@ -304,13 +306,14 @@ async function entrarCodigo(valor){
   if(codigo.length<5){telaLogin("Digite o código completo, como está na tirinha.");return}
   b.disabled=true;b.textContent="Entrando…";LOGANDO=true;
   try{
-    const cred=await auth.signInAnonymously(),u=cred.user;
-    const a=await db.collection("acessos").doc(codigo).get();
-    if(!a.exists){LOGANDO=false;await auth.signOut().catch(()=>{});telaLogin("Código não encontrado. Confira as letras e os números (não existe a letra O nem o número 0, nem I e 1).");return}
+    let cred;try{cred=await auth.signInAnonymously()}catch(e){throw {etapa:"E1",e}}const u=cred.user;
+    let a;try{a=await db.collection("acessos").doc(codigo).get()}catch(e){throw {etapa:"E2",e}}
+    if(!a.exists){LOGANDO=false;await auth.signOut().catch(()=>{});telaLogin("Código não encontrado. Confira as letras e os números (o código não usa a letra O nem o número 0, nem I e 1).");return}
     const d=a.data(),ses={codigo,turmaId:d.turmaId,aluno:d.aluno,nome:d.nome,criadoEm:firebase.firestore.FieldValue.serverTimestamp()};
-    await db.collection("sessoes").doc(u.uid).set(ses);
+    try{await db.collection("sessoes").doc(u.uid).set(ses)}catch(e){throw {etapa:"E3",e}}
     USER=usuarioDeSessao(u,ses);LOGANDO=false;abrir();
-  }catch(e){LOGANDO=false;await auth.signOut().catch(()=>{});telaLogin(e&&e.code==="auth/operation-not-allowed"?"A entrada por código ainda não foi ativada pelo professor.":"Não foi possível entrar agora. Confira a internet e tente de novo.")}
+  }catch(x){LOGANDO=false;await auth.signOut().catch(()=>{});const et=x&&x.etapa||"E0",c=(x&&x.e&&x.e.code)||(x&&x.code)||"";
+    telaLogin(c==="auth/operation-not-allowed"?"A entrada por código ainda não foi ativada pelo professor. (erro E1)":c==="auth/network-request-failed"||c==="unavailable"?"Sem conexão com a internet. Confira e tente de novo.":`Não foi possível entrar com o código. Avise o professor: erro ${et}${c?" · "+c:""}.`)}
 }
 async function entrar(){
   const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
@@ -334,7 +337,7 @@ async function abrir(){
   catch(e){
     tela(`<div class="card"><div class="top"><span>${esc(USER.email)}</span><button id="bSair">Trocar de conta</button></div>
       <h1>Indisponível no momento</h1>
-      <p>${e.code==="not-found"?"Este link não existe. Confira com o professor.":"Esta avaliação não está aberta, ou a sua conta não tem acesso a esta turma. Use o e-mail da escola cadastrado pelo professor ou uma conta Gmail."}</p>
+      <p>${e.code==="not-found"?"Este link não existe. Confira com o professor.":"Esta avaliação não está aberta, ou a sua conta não tem acesso a esta turma. Se entrou com conta Google, confira se é a conta certa; se o problema continuar, use o código de acesso."}</p>
       <p class="muted small">Se acha que é um engano, mostre esta tela ao professor.</p></div>`);
     $("#bSair").onclick=sair;return;
   }
