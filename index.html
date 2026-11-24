@@ -27,6 +27,9 @@
 }
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:20px}
+.mao{display:flex;gap:10px;align-items:flex-start;background:var(--warn-bg);border:1px solid #B9782A;border-radius:10px;padding:10px 12px;margin-top:10px}.mao>span{font-size:1.5rem;line-height:1}
+.anx-bt{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.anx-bt label.btn{cursor:pointer}
+.anx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.anx{margin:0;border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--sunk)}.anx-img{display:flex;align-items:center;justify-content:center;width:100%;height:160px;border:0;background:#fff;border-radius:6px;padding:0;cursor:zoom-in;overflow:hidden}.anx-img img{max-width:100%;max-height:100%}.anx figcaption{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:.85rem;margin-top:6px}
 body.travado .wrap,body.travado .bar{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body.travado input,body.travado textarea{-webkit-user-select:text;user-select:text}
 @media print{body{display:none!important}}
@@ -158,7 +161,7 @@ function ordem(seed){const R=rng(seed);return PROVA.questoes.map(q=>{const n=q.t
 
 /* ---------- rascunho local ---------- */
 const chave=()=>`prova_${PROVA_ID}_${USER.idAluno}`;
-function novoEstado(){return {seed:Math.floor(Math.random()*2147483647),inicio:Date.now(),saidas:0,log:[],reinicios:0,emAndamento:false,resp:PROVA.questoes.map(q=>q.tipo==="mc"?-1:q.tipo==="vf"?q.afirmacoes.map(()=>""):q.tipo==="memoria"?{f:[],j:0}:q.tipo==="forca"?q.palavras.map(()=>""):Array((q.enunciado.match(/\{\{#\}\}/g)||[]).length).fill(""))}}
+function novoEstado(){return {seed:Math.floor(Math.random()*2147483647),inicio:Date.now(),saidas:0,log:[],reinicios:0,emAndamento:false,resp:PROVA.questoes.map(q=>q.tipo==="caderno"?false:q.tipo==="anexo"?{f:[],ok:false}:q.tipo==="mc"?-1:q.tipo==="vf"?q.afirmacoes.map(()=>""):q.tipo==="memoria"?{f:[],j:0}:q.tipo==="forca"?q.palavras.map(()=>""):Array((q.enunciado.match(/\{\{#\}\}/g)||[]).length).fill(""))}}
 function carregar(){try{const s=JSON.parse(localStorage.getItem(chave()));if(s&&Array.isArray(s.resp)&&s.resp.length===PROVA.questoes.length)return s}catch{}return novoEstado()}
 function salvar(){if(!ST)return;ST.salvoLocal=Date.now();try{localStorage.setItem(chave(),JSON.stringify({...ST,tela:TELA}))}catch{}agendarNuvem()}
 /* ---------- rascunho na nuvem (atividades): continuar depois, em qualquer aparelho ---------- */
@@ -261,7 +264,7 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("keyup",e=>{if(PROVA&&e.key==="PrintScreen")tentativa("capturar a tela")},true);
 window.addEventListener("blur",()=>setTimeout(()=>{if(!document.hasFocus())violacao("trocou de janela ou programa")},1200));
 ["fullscreenchange","webkitfullscreenchange"].forEach(ev=>document.addEventListener(ev,()=>{if(!fsEl()&&fsAtivo){fsAtivo=false;violacao("saiu da tela cheia")}}));
-function respondida(i){const q=PROVA.questoes[i],r=ST.resp[i];if(q.tipo==="mc")return r>=0;if(q.tipo==="vf")return r.every(x=>x);if(q.tipo==="memoria")return r.f.length===q.pares.length;if(q.tipo==="forca")return q.palavras.every((w,k)=>forcaEstado(w,r[k]).fim);return r.every(x=>String(x).trim())}
+function respondida(i){const q=PROVA.questoes[i],r=ST.resp[i];if(q.tipo==="caderno")return r===true;if(q.tipo==="anexo")return !!(r&&r.f&&r.f.length&&r.ok);if(q.tipo==="mc")return r>=0;if(q.tipo==="vf")return r.every(x=>x);if(q.tipo==="memoria")return r.f.length===q.pares.length;if(q.tipo==="forca")return q.palavras.every((w,k)=>forcaEstado(w,r[k]).fim);return r.every(x=>String(x).trim())}
 
 /* ---------- início ---------- */
 async function iniciar(){
@@ -349,6 +352,7 @@ async function abrir(){
       <p><button class="btn" id="bSair">Sair da conta</button></p></div>`);
     $("#bSair").onclick=sair;return;
   }
+  if(temAnexo())PROVA.vigiar=false; /* a câmera do celular tira da tela cheia: com anexo, sem anticola */
   ST=carregar();
   if(NUVEM()){try{const r=await rascRef().get();if(r.exists){const n=JSON.parse(r.data().estado||"null");if(n&&Array.isArray(n.resp)&&n.resp.length===PROVA.questoes.length&&(n.salvoLocal||0)>(ST.salvoLocal||0)){ST=n;setTimeout(()=>avisoNuvem("Continuando de onde você parou."),400)}nuvemOk=r.data().salvoEm?.toDate?.()||null}}catch{}}
   ORDEM=ordem(ST.seed);QORD=qordem(ST.seed);TELA=typeof ST.tela==="number"?ST.tela:0;
@@ -362,7 +366,7 @@ function enviada(ts,auto){
   const quando=ts&&ts.toDate?ts.toDate().toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"";
   tela(`<div class="card center">
     <div class="big-ok" aria-hidden="true">✓</div>
-    <h1>${PROVA?tu():"Avaliação"} enviada, aguardando correção</h1>
+    <h1>${PROVA?tu():"Avaliação"} ${PROVA&&temAnexo()?"entregue":"enviada"}, aguardando correção</h1>
     ${auto?`<p class="alert">O tempo terminou e suas respostas foram enviadas automaticamente.</p>`:""}${quando?`<p class="muted">Enviada em ${esc(quando)}.</p>`:""}
     <p>Você já pode fechar esta página.</p>
     <p><button class="btn" id="bSair">Sair da conta</button></p></div>`);
@@ -370,7 +374,7 @@ function enviada(ts,auto){
 }
 
 /* ---------- telas da prova ---------- */
-const N=()=>PROVA.questoes.length, ULT=()=>N()+1;
+const N=()=>PROVA.questoes.length, ULT=()=>N()+1, temAnexo=()=>PROVA.questoes.some(q=>q.tipo==="anexo");
 function cabecalho(){
   return `<div class="top"><span>${esc(USER.displayName||USER.email)}</span><button id="bSair">Sair</button></div>
   <h1>${esc(PROVA.titulo)}</h1>
@@ -392,7 +396,7 @@ function mostrar(i){
     corpo=`<section class="card"><h2>Revisão</h2>
       <p>${faltam.length?`Faltam <b>${faltam.length}</b> questão(ões) sem resposta completa.`:"Todas as questões estão respondidas."}</p>
       <ol class="rev-list">${PROVA.questoes.map((q,k)=>`<li><button class="btn" style="padding:2px 10px" data-ir="${k+1}">Questão ${k+1}</button> ${respondida(QORD[k])?"respondida":'<span class="vazia">incompleta</span>'}</li>`).join("")}</ol>
-      <div class="acts" style="justify-content:flex-start"><button class="btn primary" id="bEnviar" ${PREVIEW?"disabled":""}>Enviar ${tl()}</button>${PREVIEW?'<button class="btn" id="bFimTeste">Encerrar teste</button>':""}</div></section>`;
+      <div class="acts" style="justify-content:flex-start"><button class="btn primary" id="bEnviar" ${PREVIEW?"disabled":""}>${temAnexo()?"Entregar":"Enviar"} ${tl()}</button>${PREVIEW?'<button class="btn" id="bFimTeste">Encerrar teste</button>':""}</div></section>`;
   }else corpo=`<section class="card" id="qcard"></section>`;
   tela(cabecalho()+corpo);
   $("#bSair").onclick=async()=>{const r=await dialogo("Sair?",`<p>Suas respostas continuam salvas neste navegador, mas a ${tl()} <b>não foi enviada</b>.</p>`,[[`Continuar a ${tl()}`,0],["Sair",1,"primary"]]);if(r)sair()};
@@ -439,6 +443,114 @@ function questao(qi,pos){
   }
   if(q.tipo==="memoria")jogoMemoria(q,qi,box);
   if(q.tipo==="forca")jogoForca(q,qi,box);
+  if(q.tipo==="caderno")questaoCaderno(q,qi,box);
+  if(q.tipo==="anexo")questaoAnexo(q,qi,box);
+}
+/* ---------- questão respondida no caderno (à mão) ---------- */
+function questaoCaderno(q,qi,box){
+  const av=document.createElement("div");av.className="mao";
+  av.innerHTML=`<span aria-hidden="true">✍</span><div><b>Responda no caderno, à mão</b> (caneta ou lápis). Escreva o número da questão: <b>Questão ${QORD.indexOf(qi)+1}</b>. Não digite a resposta: respostas digitadas não são aceitas.</div>`;
+  box.appendChild(av);
+  const lab=document.createElement("label");lab.className="opt"+(ST.resp[qi]===true?" sel":"");lab.style.marginTop="12px";
+  const inp=document.createElement("input");inp.type="checkbox";inp.checked=ST.resp[qi]===true;
+  inp.onchange=()=>{ST.resp[qi]=inp.checked;lab.classList.toggle("sel",inp.checked);salvar();montarNav();barra()};
+  lab.append(inp,document.createTextNode(" Já respondi esta questão no caderno"));box.appendChild(lab);
+}
+/* ---------- anexar fotos/PDF do caderno ----------
+   As imagens são reduzidas no aparelho (JPEG) e gravadas no Firestore, uma página por documento.
+   O Firebase Storage exige plano pago, por isso não é usado. */
+const ANX_MAX=12,ANX_LIM=880000,ANX_CACHE=new Map();
+let ANX_OCUPADO=false;
+function carregarPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  return new Promise((ok,erro)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";ok(window.pdfjsLib)};s.onerror=()=>erro(new Error("pdfjs"));document.head.appendChild(s)});
+}
+function jpegDe(src,w,h){
+  let esc_=Math.min(1,1600/Math.max(w,h)),qual=0.82;
+  for(let t=0;t<12;t++){
+    const c=document.createElement("canvas");c.width=Math.max(1,Math.round(w*esc_));c.height=Math.max(1,Math.round(h*esc_));
+    const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(src,0,0,c.width,c.height);
+    const d=c.toDataURL("image/jpeg",qual);if(d.length<ANX_LIM)return {dados:d,w:c.width,h:c.height};
+    if(qual>0.55)qual-=0.09;else esc_*=0.82;
+  }
+  throw new Error("grande");
+}
+function imagemDeArquivo(file){
+  return new Promise((ok,erro)=>{const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{try{ok(jpegDe(img,img.naturalWidth,img.naturalHeight))}catch(e){erro(e)}finally{URL.revokeObjectURL(url)}};
+    img.onerror=()=>{URL.revokeObjectURL(url);erro(new Error("formato"))};img.src=url});
+}
+async function paginasDePdf(file,cada){
+  const lib=await carregarPdfJs(),pdf=await lib.getDocument({data:await file.arrayBuffer()}).promise;
+  for(let n=1;n<=pdf.numPages;n++){
+    const pg=await pdf.getPage(n),v0=pg.getViewport({scale:1}),sc=Math.min(2.5,1600/Math.max(v0.width,v0.height)),v=pg.getViewport({scale:sc});
+    const c=document.createElement("canvas");c.width=Math.round(v.width);c.height=Math.round(v.height);
+    const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);
+    await pg.render({canvasContext:x,viewport:v}).promise;
+    if(!(await cada(jpegDe(c,c.width,c.height),n,pdf.numPages)))break;
+  }
+}
+const idAleatorio=()=>{const a="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";let r="";const v=crypto.getRandomValues(new Uint8Array(12));v.forEach(b=>r+=a[b%a.length]);return r};
+async function gravarAnexo(img,nomeArq){
+  const id=`${PROVA_ID}_${USER.idAluno}_${idAleatorio()}`;
+  if(!PREVIEW)await db.collection("anexos").doc(id).set({provaId:PROVA_ID,uid:USER.uid,dono:USER.idAluno,nome:String(nomeArq||"").slice(0,120),pagina:0,w:img.w,h:img.h,dados:img.dados,criadoEm:firebase.firestore.FieldValue.serverTimestamp()});
+  ANX_CACHE.set(id,img.dados);return id;
+}
+async function dadosAnexo(id){
+  if(ANX_CACHE.has(id))return ANX_CACHE.get(id);
+  try{const d=await db.collection("anexos").doc(id).get();if(d.exists){ANX_CACHE.set(id,d.data().dados);return d.data().dados}}catch{}
+  return null;
+}
+function questaoAnexo(q,qi,box){
+  const r=ST.resp[qi];if(!r.f)ST.resp[qi]={f:[],ok:false};
+  const R=()=>ST.resp[qi];
+  const wrap=document.createElement("div");box.appendChild(wrap);
+  wrap.innerHTML=`<div class="mao"><span aria-hidden="true">📷</span><div><b>Só valem respostas escritas à mão no caderno</b> (caneta ou lápis). Fotos de tela, prints, textos digitados ou copiados não são aceitos e ficam com nota zero. Coloque <b>nome completo</b> e <b>data</b> no topo de cada página e tire fotos nítidas, com boa luz, de uma página por vez.</div></div>
+    <div class="anx-bt"><label class="btn primary"><input type="file" accept="image/*" capture="environment" id="anxCam" hidden>📷 Tirar foto</label>
+      <label class="btn"><input type="file" accept="image/jpeg,image/png,image/*,application/pdf,.pdf,.jpg,.jpeg,.png" multiple id="anxArq" hidden>📎 Escolher arquivos (JPG, PNG ou PDF)</label></div>
+    <p class="small muted" id="anxSt" aria-live="polite" style="margin:6px 0"></p>
+    <div class="anx-grid" id="anxG"></div>
+    <label class="opt" id="anxOkL" style="margin-top:12px"><input type="checkbox" id="anxOk"> Declaro que as respostas foram escritas por mim, à mão, no caderno.</label>`;
+  const st=wrap.querySelector("#anxSt"),g=wrap.querySelector("#anxG"),ok=wrap.querySelector("#anxOk");
+  ok.checked=!!R().ok;wrap.querySelector("#anxOkL").classList.toggle("sel",ok.checked);
+  ok.onchange=()=>{R().ok=ok.checked;wrap.querySelector("#anxOkL").classList.toggle("sel",ok.checked);salvar();montarNav();barra()};
+  const status=t=>{st.textContent=t||(R().f.length?`${R().f.length} página(s) anexada(s). Máximo: ${ANX_MAX}.`:"Nenhum arquivo anexado ainda.")};
+  const desenha=()=>{
+    g.innerHTML=R().f.map((id,k)=>`<figure class="anx"><button class="anx-img" data-ver="${k}" aria-label="Ver página ${k+1} ampliada"><span class="small muted">carregando…</span></button><figcaption>Página ${k+1} <button class="btn" data-rm="${k}" style="padding:2px 8px">Remover</button></figcaption></figure>`).join("");
+    R().f.forEach(async(id,k)=>{const d=await dadosAnexo(id),b=g.querySelector(`[data-ver="${k}"]`);if(b)b.innerHTML=d?`<img src="${d}" alt="Página ${k+1} anexada">`:'<span class="small" style="color:var(--bad)">não foi possível carregar</span>'});
+    g.querySelectorAll("[data-ver]").forEach(b=>b.onclick=async()=>{const d=await dadosAnexo(R().f[+b.dataset.ver]);if(d)dialogo(`Página ${+b.dataset.ver+1}`,`<img src="${d}" alt="" style="max-width:100%;max-height:70vh;display:block;margin:auto">`,[["Fechar",0,"primary"]])});
+    g.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{
+      if(ANX_OCUPADO)return;const k=+b.dataset.rm,id=R().f[k];
+      if(!(await dialogo("Remover esta página?","<p>A foto será apagada.</p>",[["Cancelar",0],["Remover",1,"primary"]])))return;
+      ANX_OCUPADO=true;status("Removendo…");
+      try{if(!PREVIEW)await db.collection("anexos").doc(id).delete();R().f.splice(k,1);ANX_CACHE.delete(id);salvar();salvarNuvem(true)}catch(e){avisoNuvem("Não foi possível remover agora. Confira a internet.",true)}
+      ANX_OCUPADO=false;status();desenha();montarNav();barra();
+    });
+    status();
+  };
+  const receber=async files=>{
+    files=[...files];if(!files.length||ANX_OCUPADO)return;ANX_OCUPADO=true;let erros=[];
+    wrap.querySelectorAll("input[type=file]").forEach(i=>i.disabled=true);
+    const add=async(img,nome)=>{if(R().f.length>=ANX_MAX){erros.push(`limite de ${ANX_MAX} páginas atingido`);return false}
+      const id=await gravarAnexo(img,nome);R().f.push(id);salvar();desenha();return true};
+    for(const f of files){
+      const nome=f.name||"foto",pdf=f.type==="application/pdf"||/\.pdf$/i.test(nome);
+      try{
+        if(pdf){status(`Lendo o PDF ${nome}…`);await paginasDePdf(f,async(img,n,t)=>{status(`Enviando página ${n} de ${t} do PDF…`);return add(img,`${nome} p.${n}`)})}
+        else if(/^image\//.test(f.type)||/\.(jpe?g|png|webp|heic|heif)$/i.test(nome)){status(`Preparando ${nome}…`);const img=await imagemDeArquivo(f);status(`Enviando ${nome}…`);if(!(await add(img,nome)))break}
+        else erros.push(`${nome}: formato não aceito (use JPG, PNG ou PDF)`);
+      }catch(e){erros.push(e&&e.message==="formato"?`${nome}: o aparelho não conseguiu abrir esta imagem. Envie em JPG ou PNG.`:e&&e.message==="pdfjs"?"não foi possível carregar o leitor de PDF. Confira a internet ou envie fotos.":e&&e.code==="permission-denied"?`${nome}: envio recusado (a atividade pode estar encerrada).`:`${nome}: não foi possível enviar. Confira a internet e tente de novo.`)}
+      if(R().f.length>=ANX_MAX)break;
+    }
+    ANX_OCUPADO=false;wrap.querySelectorAll("input[type=file]").forEach(i=>{i.disabled=false;i.value=""});
+    if(NUVEM())salvarNuvem(true);
+    desenha();montarNav();barra();
+    if(erros.length)dialogo("Atenção",`<ul>${[...new Set(erros)].map(e=>`<li>${esc(e)}</li>`).join("")}</ul>`,[["Entendi",0,"primary"]]);
+  };
+  wrap.querySelector("#anxCam").onchange=e=>receber(e.target.files);
+  wrap.querySelector("#anxArq").onchange=e=>receber(e.target.files);
+  desenha();
 }
 /* ---------- jogo da memória ---------- */
 const imgOuEmoji=v=>/^\s*<svg[\s>]/i.test(v||"")?`<img alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(v)}">`:`<span class="emo">${esc(v||"")}</span>`;
@@ -517,8 +629,13 @@ function tick(){
 /* ---------- envio ---------- */
 async function enviar(auto){
   if(PREVIEW||ENVIANDO)return;
+  if(ANX_OCUPADO&&!auto){dialogo("Aguarde",`<p>Ainda estou enviando as fotos. Espere terminar e clique de novo.</p>`,[["Entendi",0,"primary"]]);return}
+  const semAnexo=PROVA.questoes.map((q,k)=>k).filter(k=>PROVA.questoes[k].tipo==="anexo"&&!respondida(k));
+  if(semAnexo.length&&!auto){const pos=QORD.indexOf(semAnexo[0])+1,r=ST.resp[semAnexo[0]];
+    const ir=await dialogo("Falta anexar o caderno",`<p>${r.f&&r.f.length?"Marque a declaração de que as respostas foram escritas à mão.":"Anexe as fotos (ou o PDF) das respostas do caderno antes de entregar."} Isso fica na <b>questão ${pos}</b>.</p>`,[["Ir para a questão",1,"primary"]]);
+    if(ir)irPara(pos);return}
   const faltam=PROVA.questoes.filter((_,k)=>!respondida(k)).length;
-  const ok=auto?1:await dialogo(`Enviar a ${tl()}?`,`${faltam?`<p class="alert">Ainda há <b>${faltam}</b> questão(ões) incompleta(s).</p>`:""}<p>Depois de enviar, <b>não é possível alterar</b> as respostas.</p>`,[["Voltar",0],["Enviar agora",1,"primary"]]);
+  const ok=auto?1:await dialogo(temAnexo()?`Entregar a ${tl()}?`:`Enviar a ${tl()}?`,`${faltam?`<p class="alert">Ainda há <b>${faltam}</b> questão(ões) incompleta(s).</p>`:""}<p>Depois de enviar, <b>não é possível alterar</b> as respostas.</p>`,[["Voltar",0],[temAnexo()?"Entregar agora":"Enviar agora",1,"primary"]]);
   if(!ok)return;
   ENVIANDO=true;const b=$("#bEnviar")||document.createElement("button");b.disabled=true;b.textContent="Enviando…";pausado=true;
   if(auto)tela(`<div class="card center"><h1>Tempo esgotado</h1><p>Enviando suas respostas automaticamente…</p></div>`);
@@ -529,7 +646,7 @@ async function enviar(auto){
   batch.set(db.collection("recibos").doc(id),{uid:USER.uid,provaId:PROVA_ID,enviadoEm:ts});
   try{await batch.commit();ST.emAndamento=false;localStorage.removeItem(chave());clearTimeout(nuvemT);nuvemSujo=false;if(NUVEM())rascRef().delete().catch(()=>{});sairTelaCheia();pararRelogio();enviada(firebase.firestore.Timestamp.now(),auto)}
   catch(e){
-    ENVIANDO=false;b.disabled=false;b.textContent=`Enviar ${tl()}`;pausado=false;if(auto){sairTelaCheia();mostrar(ULT())}
+    ENVIANDO=false;b.disabled=false;b.textContent=`${temAnexo()?"Entregar":"Enviar"} ${tl()}`;pausado=false;if(auto){sairTelaCheia();mostrar(ULT())}
     const msg=e.code==="permission-denied"?"O envio foi recusado. Ela pode ter sido encerrada ou já foi enviada antes. Suas respostas continuam salvas neste navegador: mostre esta tela ao professor.":"Não consegui enviar. Verifique a internet e tente de novo. Suas respostas continuam salvas.";
     dialogo("Não foi enviado",`<p>${msg}</p>`,[["Entendi",0,"primary"]]);
   }

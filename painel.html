@@ -94,6 +94,11 @@ td.r,th.r{text-align:right}
 .cq p{white-space:pre-line}
 .cq-h{display:flex;justify-content:space-between;gap:10px;font-weight:700;margin-bottom:6px}
 .ca{padding:4px 8px;border-radius:6px;margin:3px 0}
+.anxg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:8px}.anxi{height:200px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px;cursor:zoom-in;display:flex;align-items:center;justify-content:center;overflow:hidden}.anxi img{max-width:100%;max-height:100%}
+.corr-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.corr-fotos{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow:auto;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface,#fff)}.anxi.grande{width:100%;height:auto;min-height:200px}.anxi.grande img{max-height:none;width:100%}
+@media (max-width:900px){.corr-grid{grid-template-columns:1fr}.corr-fotos{position:static;max-height:none}}
+.anx-zoom{position:fixed;inset:0;z-index:60;background:rgba(10,14,18,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px}.anx-zoom img{max-width:94vw;max-height:84vh;background:#fff;transition:transform .2s}
+@media print{.anxi{height:auto;break-inside:avoid}.anxi img{max-height:none}}
 .ca.correta{background:var(--ok-bg)} .ca.marcada-errada{background:var(--bad-bg)}
 code{font-family:var(--mono);font-size:.88em;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 4px}
 .fig{margin:6px 0 10px;text-align:center}.fig img{max-width:100%;height:auto;max-height:320px;border-radius:10px;background:#fff;border:1px solid var(--line)}
@@ -194,7 +199,7 @@ let ultimoUso=Date.now();["click","keydown","touchstart"].forEach(ev=>document.a
 setInterval(()=>{if(auth.currentUser&&Date.now()-ultimoUso>30*60000)auth.signOut()},30000);
 
 let DIAG_FEITO=false;
-async function conferirRegras(){if(DIAG_FEITO)return;DIAG_FEITO=true;try{await db.collection("diag").doc("regras-v7").get()}catch{const d=document.createElement("div");d.setAttribute("role","alert");d.style.cssText="position:sticky;top:0;z-index:20;background:#a63a32;color:#fff;padding:10px 16px;font-weight:700;text-align:center";d.innerHTML="As regras do Firebase estão desatualizadas: a entrada por código e por conta pessoal não vai funcionar. Publique o firestore.rules novo (Firebase → Firestore Database → Regras → Publicar).";document.body.prepend(d)}}
+async function conferirRegras(){if(DIAG_FEITO)return;DIAG_FEITO=true;try{await db.collection("diag").doc("regras-v8").get()}catch{const d=document.createElement("div");d.setAttribute("role","alert");d.style.cssText="position:sticky;top:0;z-index:20;background:#a63a32;color:#fff;padding:10px 16px;font-weight:700;text-align:center";d.innerHTML="As regras do Firebase estão desatualizadas: a entrada por código, a conta pessoal e o envio de fotos do caderno não vão funcionar. Publique o firestore.rules novo (Firebase → Firestore Database → Regras → Publicar).";document.body.prepend(d)}}
 async function carregarTudo(){conferirRegras();
   const [e,t,d,p]=await Promise.all(["escolas","turmas","disciplinas","provas"].map(c=>db.collection(c).get()));
   const map=s=>s.docs.map(x=>({id:x.id,...x.data()}));
@@ -338,7 +343,7 @@ async function copiar(t){try{await navigator.clipboard.writeText(t);toast("Link 
 
 /* ================= EDITOR ================= */
 let ED=null;
-function novaQuestao(tipo="mc"){return {tipo,topico:"",enunciado:"",codigo:"",imagem:"",peso:1,anulada:false,alternativas:["","","","",""],correta:-1,afirmacoes:[{texto:"",v:true},{texto:"",v:true}],pares:[{t:"",img:""},{t:"",img:""}],palavras:[{p:"",dica:""}]}}
+function novaQuestao(tipo="mc"){return {tipo,topico:"",enunciado:"",codigo:"",imagem:"",peso:1,anulada:false,alternativas:["","","","",""],correta:-1,afirmacoes:[{texto:"",v:true},{texto:"",v:true}],pares:[{t:"",img:""},{t:"",img:""}],palavras:[{p:"",dica:""}],esperado:""}}
 const ofusca=w=>btoa([...w].map((ch,i)=>String.fromCharCode(ch.charCodeAt(0)^(73+i%7))).join(""));
 const palForca=w=>norm(w).toUpperCase().replace(/[^A-Z ]/g,"").replace(/\s+/g," ").trim();
 async function editor(p){
@@ -355,6 +360,7 @@ function faltas(){const f=[];ED.questoes.forEach((q,i)=>{
   if(q.tipo==="lacuna"&&!lacunas(q.enunciado).length)f.push([i,"sem lacunas [[ ]] no enunciado"]);
   if(q.tipo==="memoria"){const ok=(q.pares||[]).filter(p=>p.t.trim()&&p.img.trim());if(ok.length<2)f.push([i,"o jogo precisa de pelo menos 2 pares completos"]);if((q.pares||[]).some(p=>p.img.trim().startsWith("<")&&!svgOk(p.img)))f.push([i,"imagem de par inválida"])}
   if(q.tipo==="forca"&&!(q.palavras||[]).some(w=>palForca(w.p)))f.push([i,"sem palavras"]);
+  if(q.tipo==="caderno"&&!ED.questoes.some(x=>x.tipo==="anexo"))f.push([i,"falta uma questão “Anexar fotos do caderno” para o aluno enviar as fotos"]);
 });return f}
 function desenharEditor(){
   const ds=DISC.filter(d=>turma(d.turmaId)?.ano===ANO);
@@ -383,7 +389,7 @@ function desenharEditor(){
   ${F.length?`<div class="alert bad"><b>Pendências antes de abrir:</b> ${F.map(([i,m])=>`questão ${i+1} (${esc(m)})`).join("; ")}.</div>`:""}
   <div id="eQs">${ED.questoes.map((q,i)=>qHTML(q,i,fset.has(i))).join("")}</div>
   <div class="row noprint" style="margin-bottom:16px">
-    <button class="btn" data-add="mc">+ Múltipla escolha</button><button class="btn" data-add="vf">+ Verdadeiro ou falso</button><button class="btn" data-add="lacuna">+ Completar lacunas</button><button class="btn" data-add="memoria">+ Jogo da memória</button><button class="btn" data-add="forca">+ Jogo da forca</button>
+    <button class="btn" data-add="mc">+ Múltipla escolha</button><button class="btn" data-add="vf">+ Verdadeiro ou falso</button><button class="btn" data-add="lacuna">+ Completar lacunas</button><button class="btn" data-add="memoria">+ Jogo da memória</button><button class="btn" data-add="forca">+ Jogo da forca</button><button class="btn" data-add="caderno">+ Responder no caderno</button><button class="btn" data-add="anexo">+ Anexar fotos do caderno</button>
   </div>
   <section class="panel"><div class="row">
     <button class="btn primary" id="eSalvar">Salvar</button>
@@ -396,13 +402,15 @@ function desenharEditor(){
   ligarEditor();
 }
 function qHTML(q,i,falta){
-  const tipoNome={mc:"Múltipla escolha",vf:"Verdadeiro ou falso",lacuna:"Completar lacunas",memoria:"Jogo da memória",forca:"Jogo da forca"}[q.tipo];
+  const tipoNome={mc:"Múltipla escolha",vf:"Verdadeiro ou falso",lacuna:"Completar lacunas",memoria:"Jogo da memória",forca:"Jogo da forca",caderno:"Responder no caderno",anexo:"Anexar fotos do caderno"}[q.tipo];
   let corpo="";
   if(q.tipo==="mc")corpo=`<div class="hint" style="margin:6px 0">Marque a alternativa correta:</div>${q.alternativas.map((a,k)=>`<div class="alt"><input type="radio" name="c${i}" data-q="${i}" data-correta="${k}" ${q.correta===k?"checked":""} aria-label="Alternativa ${LETRAS[k]} é a correta"><b>${LETRAS[k]})</b><input type="text" data-q="${i}" data-alt="${k}" value="${esc(a)}"><button class="btn sm" data-q="${i}" data-rmalt="${k}" aria-label="Remover alternativa ${LETRAS[k]}" ${q.alternativas.length<=2?"disabled":""}>×</button></div>`).join("")}
     ${q.alternativas.length<8?`<button class="btn sm" data-q="${i}" data-addalt>+ alternativa</button>`:""}`;
   if(q.tipo==="vf")corpo=`<div class="hint" style="margin:6px 0">Afirmações e o gabarito de cada uma:</div>${q.afirmacoes.map((a,k)=>`<div class="alt" style="grid-template-columns:auto 1fr auto auto"><b>${k+1}.</b><input type="text" data-q="${i}" data-af="${k}" value="${esc(a.texto)}"><select data-q="${i}" data-afv="${k}" style="width:auto"><option value="1" ${a.v?"selected":""}>Verdadeira</option><option value="0" ${!a.v?"selected":""}>Falsa</option></select><button class="btn sm" data-q="${i}" data-rmaf="${k}" ${q.afirmacoes.length<=1?"disabled":""} aria-label="Remover afirmação ${k+1}">×</button></div>`).join("")}<button class="btn sm" data-q="${i}" data-addaf>+ afirmação</button>`;
   if(q.tipo==="memoria"){q.pares||=[];corpo=`<div class="hint" style="margin:6px 0">Pares: palavra e imagem. A imagem pode ser um código SVG ou um emoji. O aluno vira as cartas até juntar cada palavra com a sua imagem.</div>${q.pares.map((p,k)=>`<div class="alt" style="grid-template-columns:auto 1fr 1.4fr auto auto;align-items:center"><b>${k+1}.</b><input type="text" data-q="${i}" data-mp="${k}" value="${esc(p.t)}" placeholder="Palavra" aria-label="Palavra do par ${k+1}"><input type="text" data-q="${i}" data-mi="${k}" value="${esc(p.img)}" placeholder="SVG ou emoji" aria-label="Imagem do par ${k+1}"><span class="mini">${p.img.trim().startsWith("<")&&svgOk(p.img)?`<img src="${svgSrc(p.img)}" alt="" style="width:40px;height:40px">`:`<span style="font-size:1.6rem">${esc(p.img.trim().startsWith("<")?"":p.img)}</span>`}</span><button class="btn sm" data-q="${i}" data-rmpar="${k}" ${q.pares.length<=2?"disabled":""} aria-label="Remover par ${k+1}">×</button></div>`).join("")}${q.pares.length<15?`<button class="btn sm" data-q="${i}" data-addpar>+ par</button>`:""}`}
   if(q.tipo==="forca"){q.palavras||=[];corpo=`<div class="hint" style="margin:6px 0">Palavras e dicas. Acentos são ignorados no jogo. Cada palavra permite até 6 erros.</div>${q.palavras.map((w,k)=>`<div class="alt" style="grid-template-columns:auto 1fr 2fr auto;align-items:center"><b>${k+1}.</b><input type="text" data-q="${i}" data-fp="${k}" value="${esc(w.p)}" placeholder="Palavra" aria-label="Palavra ${k+1}"><input type="text" data-q="${i}" data-fdi="${k}" value="${esc(w.dica)}" placeholder="Dica" aria-label="Dica ${k+1}"><button class="btn sm" data-q="${i}" data-rmpal="${k}" ${q.palavras.length<=1?"disabled":""} aria-label="Remover palavra ${k+1}">×</button></div>`).join("")}${q.palavras.length<10?`<button class="btn sm" data-q="${i}" data-addpal>+ palavra</button>`:""}`}
+  if(q.tipo==="caderno")corpo=`<div class="hint" style="margin:6px 0">O aluno responde à mão, no caderno, e depois anexa as fotos na questão “Anexar fotos do caderno”. Você corrige olhando as fotos.</div><label class="f">Resposta esperada (só você vê, aparece na correção)<textarea data-q="${i}" data-esp rows="3">${esc(q.esperado||"")}</textarea></label>`;
+  if(q.tipo==="anexo")corpo=`<div class="hint" style="margin:6px 0">O aluno anexa fotos (JPG, PNG) ou PDF das respostas escritas no caderno e só consegue entregar depois de anexar. Até 12 páginas. Use peso 0 se esta questão não deve valer nota. Com esta questão, o modo anticola fica desligado (a câmera do celular sai da tela cheia).</div>`;
   if(q.tipo==="lacuna"){const l=lacunas(q.enunciado);corpo=`<div class="hint" style="margin-top:6px">${l.length?`${l.length} lacuna(s): ${l.map((a,k)=>`${k+1}) ${esc(a.join(" ou "))}`).join(" · ")}`:"Nenhuma lacuna: escreva as respostas entre [[ ]] no enunciado."}</div>`}
   return `<div class="qed ${falta?"falta":""}" id="qe${i}">
     <div class="qed-h"><span class="row" style="align-items:center"><span class="n">${i+1}</span><b>${tipoNome}</b></span>
@@ -429,6 +437,7 @@ function ligarEditor(){
   $$("[data-correta]").forEach(el=>el.onchange=()=>{ED.questoes[+el.dataset.q].correta=+el.dataset.correta;redesenha()});
   $$("[data-af]").forEach(el=>el.oninput=()=>{ED.questoes[+el.dataset.q].afirmacoes[+el.dataset.af].texto=el.value});
   $$("[data-afv]").forEach(el=>el.onchange=()=>{ED.questoes[+el.dataset.q].afirmacoes[+el.dataset.afv].v=el.value==="1"});
+  $$("[data-esp]").forEach(el=>el.oninput=()=>{ED.questoes[+el.dataset.q].esperado=el.value});
   $$("[data-anul]").forEach(el=>el.onchange=()=>{ED.questoes[+el.dataset.q].anulada=el.checked});
   $$("[data-addalt]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].alternativas.push("");redesenha()});
   $$("[data-rmalt]").forEach(b=>b.onclick=()=>{const q=ED.questoes[+b.dataset.q],k=+b.dataset.rmalt;q.alternativas.splice(k,1);if(q.correta===k)q.correta=-1;else if(q.correta>k)q.correta--;redesenha()});
@@ -442,7 +451,7 @@ function ligarEditor(){
   $$("[data-addpal]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].palavras.push({p:"",dica:""});redesenha()});
   $$("[data-rmpal]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].palavras.splice(+b.dataset.rmpal,1);redesenha()});
   $$("[data-rmaf]").forEach(b=>b.onclick=()=>{ED.questoes[+b.dataset.q].afirmacoes.splice(+b.dataset.rmaf,1);redesenha()});
-  $$("[data-add]").forEach(b=>b.onclick=()=>{ED.questoes.push(novaQuestao(b.dataset.add));redesenha();setTimeout(()=>document.getElementById("qe"+(ED.questoes.length-1))?.scrollIntoView({block:"center"}),50)});
+  $$("[data-add]").forEach(b=>b.onclick=()=>{const nq=novaQuestao(b.dataset.add);if(nq.tipo==="anexo")nq.peso=0;ED.questoes.push(nq);redesenha();setTimeout(()=>document.getElementById("qe"+(ED.questoes.length-1))?.scrollIntoView({block:"center"}),50)});
   $$("[data-rmq]").forEach(b=>b.onclick=()=>{if(confirm(`Excluir a questão ${+b.dataset.q+1}?`)){ED.questoes.splice(+b.dataset.q,1);redesenha()}});
   $$("[data-up]").forEach(b=>b.onclick=()=>{const i=+b.dataset.q;[ED.questoes[i-1],ED.questoes[i]]=[ED.questoes[i],ED.questoes[i-1]];redesenha()});
   $$("[data-down]").forEach(b=>b.onclick=()=>{const i=+b.dataset.q;[ED.questoes[i+1],ED.questoes[i]]=[ED.questoes[i],ED.questoes[i+1]];redesenha()});
@@ -486,12 +495,13 @@ function publico(fonte){
     if(q.tipo==="vf"){b.enunciado=q.enunciado;b.afirmacoes=q.afirmacoes.filter(a=>a.texto.trim()).map(a=>a.texto.trim())}
     if(q.tipo==="lacuna"){b.enunciado=q.enunciado.replace(/\[\[(.+?)\]\]/g,"{{#}}")}
     if(q.tipo==="memoria"){b.enunciado=q.enunciado;b.pares=(q.pares||[]).filter(p=>p.t.trim()&&p.img.trim()).map(p=>({t:p.t.trim(),img:p.img.trim()}))}
+    if(q.tipo==="caderno"||q.tipo==="anexo"){b.enunciado=q.enunciado}
     if(q.tipo==="forca"){b.enunciado=q.enunciado;b.palavras=(q.palavras||[]).filter(w=>palForca(w.p)).map(w=>({dica:w.dica.trim(),cod:ofusca(palForca(w.p))}))}
     return b;
   });
 }
 function gabaritoDe(fonte){
-  return fonte.questoes.map(q=>q.tipo==="mc"?q.correta:q.tipo==="vf"?q.afirmacoes.filter(a=>a.texto.trim()).map(a=>a.v?"V":"F"):q.tipo==="memoria"?(q.pares||[]).filter(p=>p.t.trim()&&p.img.trim()).length:q.tipo==="forca"?(q.palavras||[]).map(w=>palForca(w.p)).filter(Boolean):lacunas(q.enunciado));
+  return fonte.questoes.map(q=>q.tipo==="caderno"?{esperado:q.esperado||""}:q.tipo==="anexo"?null:q.tipo==="mc"?q.correta:q.tipo==="vf"?q.afirmacoes.filter(a=>a.texto.trim()).map(a=>a.v?"V":"F"):q.tipo==="memoria"?(q.pares||[]).filter(p=>p.t.trim()&&p.img.trim()).length:q.tipo==="forca"?(q.palavras||[]).map(w=>palForca(w.p)).filter(Boolean):lacunas(q.enunciado));
 }
 async function salvarProva(novoStatus){
   lerCabecalho();
@@ -574,7 +584,7 @@ async function verificarSistema(t){
   const passo=(t)=>{const p={t,ok:null,d:""};passos.push(p);mostra();return p};
   const fim=(p,ok,d)=>{p.ok=ok;p.d=d||"";mostra();return ok};
   let p=passo("Regras do Firebase atualizadas");
-  try{await db.collection("diag").doc("regras-v7").get();fim(p,true,"As regras novas estão publicadas.")}
+  try{await db.collection("diag").doc("regras-v8").get();fim(p,true,"As regras novas estão publicadas.")}
   catch(e){fim(p,false,"As regras publicadas no Firebase são antigas. Abra o Firebase → Firestore Database → Regras, apague tudo, cole o conteúdo do arquivo <b>firestore.rules</b> e clique em <b>Publicar</b>. Se aparecer erro em vermelho ao publicar, mande um print.");return}
   const cods=t.codigos||{},emails=Object.keys(cods);
   p=passo("Códigos gerados para a turma");
@@ -690,7 +700,7 @@ async function abrirBancoQuestoes(){
   gs.docs.forEach(d=>{try{const f=JSON.parse(d.data().fonte);(f.questoes||[]).forEach(q=>add(q,f.titulo||"prova"))}catch{}});
   const jaNaProva=new Set(ED.questoes.map(q=>q.tipo+"|"+norm(q.enunciado)));
   const topicos=[...new Set(todas.map(x=>x.q.topico).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
-  const tipoN={mc:"Múltipla escolha",vf:"V ou F",lacuna:"Lacunas",memoria:"Jogo da memória",forca:"Jogo da forca"};
+  const tipoN={mc:"Múltipla escolha",vf:"V ou F",lacuna:"Lacunas",memoria:"Jogo da memória",forca:"Jogo da forca",caderno:"No caderno",anexo:"Anexar fotos"};
   let marcadas=new Set();
   const desenha=()=>{
     const busca=norm($("#bqB")?.value||""),top=$("#bqT")?.value||"",tp=$("#bqTp")?.value||"";
@@ -715,34 +725,37 @@ async function abrirBancoQuestoes(){
 
 /* ================= CORREÇÃO ================= */
 function forcaRes(w,tent){const L=new Set(String(tent||"").split("")),erros=[...L].filter(l=>!w.includes(l)).length,venceu=[...w].filter(c=>/[A-Z]/.test(c)).every(c=>L.has(c))&&erros<6;return {venceu,erros,letras:[...L].join("")}}
-function corrigir(prova,gab,resp){
-  const R=JSON.parse(resp.respostas||"[]");
+function corrigir(prova,gab,resp,marcas){
+  const R=JSON.parse(resp.respostas||"[]");marcas=marcas||{};let pend=0;
   let pts=0,tot=0;const det=prova.questoes.map((q,i)=>{
-    const g=gab[i],r=R[i],peso=Number(q.peso)||0;let frac=0;
+    const g=gab[i],r=R[i],peso=Number(q.peso)||0;let frac=0,manual=false;
+    if(q.tipo==="caderno"){manual=true;if(typeof marcas[i]==="number")frac=marcas[i];else if(!q.anulada)pend++}
+    if(q.tipo==="anexo")frac=r&&r.f&&r.f.length?1:0;
     if(q.tipo==="mc")frac=r===g?1:0;
     if(q.tipo==="vf"){const n=g.length;frac=n?g.filter((v,k)=>(r||[])[k]===v).length/n:0}
     if(q.tipo==="lacuna"){const n=g.length;frac=n?g.filter((acc,k)=>acc.some(a=>norm(a)===norm((r||[])[k]))).length/n:0}
     if(q.tipo==="memoria"){const f=new Set(((r||{}).f||[]).filter(k=>k>=0&&k<g));frac=g?f.size/g:0}
     if(q.tipo==="forca"){frac=g.length?g.filter((w,k)=>forcaRes(w,(r||[])[k]).venceu).length/g.length:0}
     if(q.anulada)frac=1;
-    tot+=peso;pts+=peso*frac;return {frac,peso,r,g};
+    tot+=peso;pts+=peso*frac;return {frac,peso,r,g,manual,marcada:typeof marcas[i]==="number"};
   });
   const nota=tot?pts/tot*(Number(prova.valor)||0):0;
   let oc={log:[],reinicios:0};try{oc={log:[],reinicios:0,...JSON.parse(resp.ocorrencias||"{}")}}catch{}
   oc.saidas=oc.log.filter(x=>!x.tentativa&&!x.info).length;oc.tent=oc.log.filter(x=>x.tentativa).length;
-  return {det,nota,acertos:det.filter(d=>d.frac===1).length,pct:tot?pts/tot:0,oc};
+  return {det,nota,acertos:det.filter(d=>d.frac===1).length,pct:tot?pts/tot:0,oc,pend};
 }
 let RES=null;
 async function resultados(p){
   SUB=()=>desenharResultados();$("#view").innerHTML=`<p class="muted">Carregando envios…</p>`;
-  const [g,rs,rasc]=await Promise.all([db.collection("gabaritos").doc(p.id).get(),db.collection("respostas").where("provaId","==",p.id).get(),db.collection("rascunhos").where("provaId","==",p.id).get().catch(()=>({docs:[]}))]);
+  const [g,rs,rasc,corr]=await Promise.all([db.collection("gabaritos").doc(p.id).get(),db.collection("respostas").where("provaId","==",p.id).get(),db.collection("rascunhos").where("provaId","==",p.id).get().catch(()=>({docs:[]})),db.collection("correcoes").where("provaId","==",p.id).get().catch(()=>({docs:[]}))]);
+  const MARCAS=new Map(corr.docs.map(d=>[d.id,d.data().marcas||{}]));
   const porUid=new Map(rasc.docs.map(d=>[d.data().uid,d.data()]));
   const prova=PROVAS.find(x=>x.id===p.id)||p,gab=JSON.parse(g.data()?.gabarito||"[]");
   const envios=rs.docs.map(d=>({id:d.id,...d.data()}));
   const t=turma(prova.turmaId),porEmail=new Map(envios.map(e=>[e.email,e]));
   const linhas=(t?.alunos||[]).map(a=>({aluno:a,envio:porEmail.get(a.email)||null}));
   envios.filter(e=>!(t?.emails||[]).includes(e.email)).forEach(e=>linhas.push({aluno:{nome:e.nome||e.email,email:e.email},envio:e,fora:true}));
-  linhas.forEach(l=>{if(l.envio)l.c=corrigir(prova,gab,l.envio)});
+  linhas.forEach(l=>{if(l.envio){l.marcas=MARCAS.get(l.envio.id)||{};l.c=corrigir(prova,gab,l.envio,l.marcas)}});
   /* atividades em andamento (rascunho salvo na nuvem) */
   rasc.docs.forEach(d=>{const x=d.data(),l=linhas.find(l=>l.aluno.email===x.email);if(l){if(!l.envio)l.rasc=x}else linhas.push({aluno:{nome:x.nome||x.email,email:x.email},envio:null,rasc:x,fora:true})});
   RES={prova,gab,linhas};desenharResultados();
@@ -757,6 +770,7 @@ function desenharResultados(){
     <div class="row"><button class="btn" id="rXls">Notas em Excel</button><button class="btn" id="rPdfAll" ${env.length?"":"disabled"}>PDF de todas as provas</button><button class="btn" id="rAtual">Atualizar</button></div></div>
     <div class="kpis">
       <div class="kpi"><div class="k">Enviaram</div><div class="v">${env.length} / ${linhas.filter(l=>!l.fora).length}</div></div>
+      ${prova.questoes.some(q=>q.tipo==="caderno")?`<div class="kpi"><div class="k">Falta corrigir</div><div class="v">${env.filter(l=>l.c.pend).length}</div></div>`:""}
       <div class="kpi"><div class="k">Média da turma</div><div class="v">${nf1(media)}</div></div>
       <div class="kpi"><div class="k">Maior nota</div><div class="v">${notas.length?nf1(Math.max(...notas)):"–"}</div></div>
       <div class="kpi"><div class="k">Menor nota</div><div class="v">${notas.length?nf1(Math.min(...notas)):"–"}</div></div>
@@ -767,8 +781,8 @@ function desenharResultados(){
       <td class="small">${l.envio?esc(fmtData(l.envio.enviadoEm)):""}</td>
       <td class="r num">${l.envio?(l.c.oc.saidas||l.c.oc.tent?`${l.c.oc.saidas?`<span style="color:var(--bad);font-weight:700">${l.c.oc.saidas}</span>`:"0"}${l.c.oc.reinicios?`<br><span class="small">${l.c.oc.reinicios} reinício(s)</span>`:""}${l.c.oc.tent?`<br><span class="small" style="color:#B9782A">${l.c.oc.tent} tentativa(s)</span>`:""}`:"0"):""}</td>
       <td class="r num">${l.envio?`${l.c.acertos}/${prova.questoes.length}`:""}</td>
-      <td class="r num"><b>${l.envio?nf1(l.c.nota):""}</b></td>
-      <td class="r">${l.envio?`<button class="btn sm primary" data-ver="${i}">Ver prova</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7" class="muted">Nenhum aluno na turma.</td></tr>'}
+      <td class="r num"><b>${l.envio?nf1(l.c.nota):""}</b>${l.envio&&l.c.pend?`<br><span class="small" style="color:#B9782A;font-weight:700">corrigir ${l.c.pend} questão(ões)</span>`:""}</td>
+      <td class="r">${l.envio?`<button class="btn sm primary" data-ver="${i}">${l.c.pend?"Corrigir":"Ver "+(prova.tipoAval||"prova").toLowerCase()}</button>`:""}</td></tr>`).join("")||'<tr><td colspan="7" class="muted">Nenhum aluno na turma.</td></tr>'}
     </tbody></table></div></section>
   ${env.length?`<section class="panel"><h2 style="margin-bottom:10px">Acerto por questão</h2><div class="qbars">${porQ.map((v,i)=>`<div class="qbar"><span>Q${i+1}</span><span class="t"><span class="${v<0.5?"low":""}" style="width:${v*100}%"></span></span><span class="num r">${Math.round(v*100)}%</span></div>`).join("")}</div><p class="hint" style="margin-top:8px">Questões em vermelho tiveram menos de 50% de acerto: vale revisar o conteúdo ou conferir o gabarito.</p></section>`:""}`;
   $("#rVoltar").onclick=()=>{SUB=null;render()};
@@ -777,11 +791,11 @@ function desenharResultados(){
   $("#rXls").onclick=exportarNotas;
   $("#rPdfAll").onclick=()=>pdfProvas(RES.linhas.filter(l=>l.envio),`${RES.prova.titulo} - ${RES.prova.turmaNome}`);
 }
-function corrigidaHTML(l){
+function corrigidaHTML(l,edit){
   const {prova}=RES,c=l.c;
   return `<div class="panel"><h2>${esc(prova.titulo)}</h2>
     <p class="small muted">${esc(prova.escolaNome)} · ${esc(prova.turmaNome)} · ${esc(prova.disciplinaNome)}</p>
-    <p><b>${esc(l.aluno.nome)}</b> · ${esc(l.aluno.email)}<br>Enviado em ${esc(fmtData(l.envio.enviadoEm))} · Acertos: ${c.acertos}/${prova.questoes.length} · <b>Nota: ${nf1(c.nota)} de ${esc(prova.valor)}</b></p>
+    <p><b>${esc(l.aluno.nome)}</b> · ${esc(l.aluno.email)}<br>Enviado em ${esc(fmtData(l.envio.enviadoEm))} · Acertos: ${c.acertos}/${prova.questoes.length} · <b>Nota: ${nf1(c.nota)} de ${esc(prova.valor)}</b>${c.pend?` · <span style="color:#B9782A;font-weight:700">falta corrigir ${c.pend} questão(ões)</span>`:""}</p>
     ${c.oc.log.length?`<div class="alert bad" style="margin-bottom:0"><b>Saídas da prova: ${c.oc.saidas}${c.oc.reinicios?` · reiniciou ${c.oc.reinicios} vez(es)`:""}${c.oc.tent?` · ${c.oc.tent} tentativa(s) bloqueada(s)`:""}</b><br>${c.oc.log.map(o=>`${new Date(o.t).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"medium"})}: ${esc(o.tipo)}${o.tentativa?" (bloqueado)":""}`).join("<br>")}</div>`:(prova.vigiar?'<p class="small muted" style="margin:0">Nenhuma saída da tela registrada.</p>':"")}</div>
     ${prova.questoes.map((q,i)=>{const d=c.det[i],cls=q.anulada?"anulada":d.frac===1?"certa":d.frac===0?"errada":"parcial";
       let corpo="";
@@ -789,10 +803,24 @@ function corrigidaHTML(l){
       if(q.tipo==="vf")corpo=q.afirmacoes.map((a,k)=>{const r=(d.r||[])[k]||"–",ok=r===d.g[k];return `<div class="ca ${ok?"correta":"marcada-errada"}">${k+1}. ${rico(a)}<br><span class="small">Resposta: <b>${r==="V"?"Verdadeiro":r==="F"?"Falso":"sem resposta"}</b> · Gabarito: <b>${d.g[k]==="V"?"Verdadeiro":"Falso"}</b></span></div>`}).join("");
       if(q.tipo==="lacuna")corpo=d.g.map((acc,k)=>{const r=(d.r||[])[k]||"",ok=acc.some(a=>norm(a)===norm(r));return `<div class="ca ${ok?"correta":"marcada-errada"}">Lacuna ${k+1}: <b>${esc(r||"sem resposta")}</b> · Aceitas: ${esc(acc.join(" / "))}</div>`}).join("");
       if(q.tipo==="memoria"){const f=(d.r||{}).f||[];corpo=`<div class="ca ${f.length===d.g?"correta":"marcada-errada"}">Pares encontrados: <b>${f.length} de ${d.g}</b> · jogadas: ${(d.r||{}).j||0}</div>`+(q.pares||[]).map((p,k)=>`<div class="ca ${f.includes(k)?"correta":"marcada-errada"}">${esc(p.t)} ${f.includes(k)?"✓":"✗"}</div>`).join("")}
+      if(q.tipo==="caderno")corpo=`${d.g&&d.g.esperado?`<div class="ca"><b>Resposta esperada:</b> <span style="white-space:pre-line">${rico(d.g.esperado)}</span></div>`:""}
+        ${edit?`<div class="row noprint corr" style="margin-top:8px" role="group" aria-label="Correção da questão ${i+1}">${[[1,"Certa"],[0.5,"Parcial"],[0,"Errada"]].map(([v,t])=>`<button class="btn sm ${d.marcada&&d.frac===v?"primary":""}" data-marca="${i}" data-v="${v}">${t}</button>`).join("")}${d.marcada?`<button class="btn sm" data-marca="${i}" data-v="x">Limpar</button>`:""}</div>`:""}`;
+      if(q.tipo==="anexo"){const f=(d.r&&d.r.f)||[];corpo=f.length?`<div class="ca ${d.r.ok?"correta":"marcada-errada"}">${f.length} página(s) anexada(s) · ${d.r.ok?"declarou que escreveu à mão":"não marcou a declaração"} · clique na foto para ampliar</div><div class="anxg">${f.map((id,k)=>`<button class="anxi" data-anx="${esc(id)}" aria-label="Página ${k+1}"><span class="small muted">carregando…</span></button>`).join("")}</div>`:`<div class="ca marcada-errada">Nenhum arquivo anexado</div>`}
       if(q.tipo==="forca")corpo=d.g.map((w,k)=>{const x=forcaRes(w,(d.r||[])[k]);return `<div class="ca ${x.venceu?"correta":"marcada-errada"}">Palavra ${k+1}: <b>${esc(w)}</b> · ${x.venceu?"descobriu":"não descobriu"} · letras tentadas: ${esc(x.letras||"nenhuma")} · erros: ${x.erros}</div>`}).join("");
       const enun=q.tipo==="lacuna"?rico(q.enunciado).replace(/\{\{#\}\}/g,"_____"):rico(q.enunciado);
-      return `<div class="cq ${cls}"><div class="cq-h"><span>Questão ${i+1}${q.topico?` · <span class="muted">${esc(q.topico)}</span>`:""}</span><span>${q.anulada?"Anulada":d.frac===1?"Certa":d.frac===0?"Errada":`Parcial (${Math.round(d.frac*100)}%)`}</span></div>
+      const pendQ=d.manual&&!d.marcada&&!q.anulada;
+      return `<div class="cq ${pendQ?"parcial":cls}"><div class="cq-h"><span>Questão ${i+1}${q.topico?` · <span class="muted">${esc(q.topico)}</span>`:""}</span><span>${pendQ?"Aguardando correção":q.anulada?"Anulada":q.tipo==="anexo"?(d.frac?"Anexou":"Não anexou"):d.frac===1?"Certa":d.frac===0?"Errada":`Parcial (${Math.round(d.frac*100)}%)`}</span></div>
         ${q.imagem?`<div class="fig"><img src="${svgSrc(q.imagem)}" alt="${esc(altSvg(q.imagem))}"></div>`:""}<p style="margin:0 0 6px">${enun}</p>${q.codigo?`<pre class="code">${esc(q.codigo)}</pre>`:""}${corpo}</div>`}).join("")}`;
+}
+function fotosLado(l){const R=JSON.parse(l.envio.respostas||"[]");const f=RES.prova.questoes.flatMap((q,i)=>q.tipo==="anexo"?((R[i]||{}).f||[]):[]);return f.length&&RES.prova.questoes.some(q=>q.tipo==="caderno")?f:null}
+const prova_temCaderno=()=>RES&&RES.prova.questoes.some(q=>q.tipo==="caderno"||q.tipo==="anexo");
+const ANX=new Map();
+async function anexoDados(id){if(ANX.has(id))return ANX.get(id);const d=await db.collection("anexos").doc(id).get().catch(()=>null);const v=d&&d.exists?d.data():null;if(v)ANX.set(id,v);return v}
+function ligarAnexos(raiz){
+  raiz.querySelectorAll("[data-anx]").forEach(async b=>{const a=await anexoDados(b.dataset.anx);b.innerHTML=a?`<img src="${a.dados}" alt="${esc(a.nome||"página anexada")}">`:'<span class="small" style="color:var(--bad)">arquivo não encontrado</span>';
+    if(a)b.onclick=()=>{const w=document.createElement("div");w.className="anx-zoom";w.innerHTML=`<img src="${a.dados}" alt=""><div class="row"><button class="btn" data-g="-90">⟲ Girar</button><button class="btn" data-g="90">Girar ⟳</button><button class="btn primary" data-fz>Fechar (Esc)</button></div>`;let ang=0;const im=w.querySelector("img");
+      w.querySelectorAll("[data-g]").forEach(x=>x.onclick=()=>{ang+=+x.dataset.g;im.style.transform=`rotate(${ang}deg)`});const fz=()=>{w.remove();document.removeEventListener("keydown",k)};const k=e=>{if(e.key==="Escape")fz()};
+      w.querySelector("[data-fz]").onclick=fz;w.onclick=e=>{if(e.target===w)fz()};document.addEventListener("keydown",k);document.body.appendChild(w)}});
 }
 function verAluno(i){
   const l=RES.linhas[i];
@@ -801,13 +829,23 @@ function verAluno(i){
     <button class="btn" id="aVoltar">← Resultados</button>
     <button class="btn primary" id="aShow">Mostrar ao aluno</button>
     <button class="btn" id="aPdf">Baixar PDF</button>
-    <button class="btn danger" id="aRefazer">Permitir refazer</button></div>${corrigidaHTML(l)}`;
+    <button class="btn danger" id="aRefazer">Permitir refazer</button></div>${prova_temCaderno()?'<p class="hint noprint">Olhe as fotos do caderno e marque cada questão como Certa, Parcial ou Errada. A nota é salva na hora.</p>':""}${fotosLado(l)?`<div class="corr-grid"><div>${corrigidaHTML(l,true)}</div><aside class="corr-fotos" aria-label="Fotos do caderno"><div class="small muted" style="margin-bottom:6px">Fotos do caderno (role aqui; clique para ampliar e girar)</div>${fotosLado(l).map((id,k)=>`<div class="small" style="margin-top:8px"><b>Página ${k+1}</b></div><button class="anxi grande" data-anx="${esc(id)}" aria-label="Página ${k+1}"><span class="small muted">carregando…</span></button>`).join("")}</aside></div>`:corrigidaHTML(l,true)}`;
+  ligarAnexos($("#view"));
+  $$("[data-marca]").forEach(b=>b.onclick=async()=>{
+    const qi=+b.dataset.marca,v=b.dataset.v,m={...(l.marcas||{})};if(v==="x")delete m[qi];else m[qi]=+v;
+    $$("[data-marca]").forEach(x=>x.disabled=true);
+    try{await db.collection("correcoes").doc(l.envio.id).set({provaId:RES.prova.id,marcas:m,atualizadoEm:FV.serverTimestamp()});l.marcas=m;l.c=corrigir(RES.prova,RES.gab,l.envio,m);const y=scrollY;verAluno(i);scrollTo(0,y);toast(l.c.pend?`Salvo · faltam ${l.c.pend}`:`Correção completa · nota ${nf1(l.c.nota)}`)}
+    catch(e){alert("Não consegui salvar a correção: "+(e.code||e.message));$$("[data-marca]").forEach(x=>x.disabled=false)}
+  });
   $("#aVoltar").onclick=()=>{SUB=()=>desenharResultados();desenharResultados()};
-  $("#aShow").onclick=()=>{$("#showBody").innerHTML=corrigidaHTML(l);$("#show").hidden=false;$("#bFecharShow").focus()};
+  $("#aShow").onclick=()=>{$("#showBody").innerHTML=corrigidaHTML(l);ligarAnexos($("#showBody"));$("#show").hidden=false;$("#bFecharShow").focus()};
   $("#aPdf").onclick=()=>pdfProvas([l],`${RES.prova.titulo} - ${l.aluno.nome}`);
   $("#aRefazer").onclick=async()=>{
     if(!confirm(`Apagar o envio de ${l.aluno.nome}? O aluno poderá fazer a prova de novo (se ela estiver aberta). Baixe o PDF antes, se quiser guardar.`))return;
-    await Promise.all([db.collection("respostas").doc(l.envio.id).delete(),db.collection("recibos").doc(l.envio.id).delete(),db.collection("rascunhos").doc(l.envio.id).delete().catch(()=>{})]);
+    const anx=await db.collection("anexos").where("provaId","==",RES.prova.id).get().catch(()=>({docs:[]}));
+    const dono=l.envio.id.slice(RES.prova.id.length+1);
+    await Promise.all([db.collection("respostas").doc(l.envio.id).delete(),db.collection("recibos").doc(l.envio.id).delete(),db.collection("rascunhos").doc(l.envio.id).delete().catch(()=>{}),db.collection("correcoes").doc(l.envio.id).delete().catch(()=>{}),
+      ...anx.docs.filter(d=>d.data().dono===dono).map(d=>d.ref.delete().catch(()=>{}))]);
     toast("Envio apagado");resultados(RES.prova);
   };
 }
@@ -817,8 +855,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#show").hidden)
 /* ================= EXPORTAÇÕES ================= */
 function exportarNotas(){
   const {prova,linhas}=RES;
-  const head=["Aluno","E-mail","Situação","Enviado em",...prova.questoes.map((_,i)=>`Q${i+1}`),"Saídas","Reinícios","Tentativas bloqueadas","Acertos","Nota"];
-  const rows=linhas.map(l=>[l.aluno.nome,l.aluno.email,l.envio?"Enviou":l.rasc?`Em andamento (${l.rasc.respondidas}/${l.rasc.total})`:"Pendente",l.envio?fmtData(l.envio.enviadoEm):"",...prova.questoes.map((_,i)=>l.envio?Math.round(l.c.det[i].frac*100)/100:""),l.envio?l.c.oc.saidas:"",l.envio?l.c.oc.reinicios:"",l.envio?l.c.oc.tent:"",l.envio?l.c.acertos:"",l.envio?Math.round(l.c.nota*100)/100:""]);
+  const head=["Aluno","E-mail","Situação","Enviado em",...prova.questoes.map((_,i)=>`Q${i+1}`),"Saídas","Reinícios","Tentativas bloqueadas","Acertos","Nota","Falta corrigir"];
+  const rows=linhas.map(l=>[l.aluno.nome,l.aluno.email,l.envio?"Enviou":l.rasc?`Em andamento (${l.rasc.respondidas}/${l.rasc.total})`:"Pendente",l.envio?fmtData(l.envio.enviadoEm):"",...prova.questoes.map((_,i)=>l.envio?Math.round(l.c.det[i].frac*100)/100:""),l.envio?l.c.oc.saidas:"",l.envio?l.c.oc.reinicios:"",l.envio?l.c.oc.tent:"",l.envio?l.c.acertos:"",l.envio?Math.round(l.c.nota*100)/100:"",l.envio?(l.c.pend||""):""]);
   const ws=XLSX.utils.aoa_to_sheet([[`${prova.titulo} · ${prova.turmaNome} · ${prova.disciplinaNome}`],[],head,...rows]);
   ws["!cols"]=[{wch:32},{wch:34},{wch:10},{wch:16},...prova.questoes.map(()=>({wch:6})),{wch:9},{wch:8}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Notas");
@@ -835,6 +873,8 @@ async function pdfProvas(lista,nome){
   const txt=(s,o={})=>{doc.setFont(o.mono?"courier":"helvetica",o.bold?"bold":"normal");doc.setFontSize(o.size||10);doc.setTextColor(...(o.cor||[27,36,48]));
     const linhas=doc.splitTextToSize(limpa(s),LW-(o.ind||0));linhas.forEach(l=>{if(y>H-50){doc.addPage();y=50}doc.text(l,M+(o.ind||0),y);y+=(o.size||10)*1.35});};
   const {prova}=RES;
+  if(prova.questoes.some(q=>q.tipo==="anexo")){toast("Baixando as fotos do caderno…");
+    for(const l of lista){const R=JSON.parse(l.envio.respostas||"[]");for(const [i,q] of prova.questoes.entries())if(q.tipo==="anexo")for(const id of ((R[i]||{}).f||[]))await anexoDados(id)}}
   lista.forEach((l,n)=>{
     if(n>0)doc.addPage();y=50;
     txt(prova.titulo,{size:15,bold:true});txt(`${prova.escolaNome} · ${prova.turmaNome} · ${prova.disciplinaNome}`,{size:9,cor:[91,102,114]});y+=4;
@@ -852,6 +892,9 @@ async function pdfProvas(lista,nome){
       if(q.tipo==="vf")q.afirmacoes.forEach((a,k)=>{const r=(d.r||[])[k]||"-";txt(`${k+1}. ${a}  | resposta: ${r} | gabarito: ${d.g[k]}`,{ind:10,cor:r===d.g[k]?[47,122,74]:[166,58,50]})});
       if(q.tipo==="lacuna")d.g.forEach((acc,k)=>{const r=(d.r||[])[k]||"";const ok=acc.some(a=>norm(a)===norm(r));txt(`Lacuna ${k+1}: ${r||"sem resposta"}  | aceitas: ${acc.join(" / ")}`,{ind:10,cor:ok?[47,122,74]:[166,58,50]})});
       if(q.tipo==="memoria"){const f=(d.r||{}).f||[];txt(`Pares encontrados: ${f.length} de ${d.g} | jogadas: ${(d.r||{}).j||0}`,{ind:10,cor:f.length===d.g?[47,122,74]:[166,58,50]})}
+      if(q.tipo==="caderno"){if(d.g&&d.g.esperado)txt(`Resposta esperada: ${d.g.esperado}`,{ind:10,cor:[91,102,114]});txt(d.manual&&!d.marcada&&!q.anulada?"Aguardando correção":`Correção: ${d.frac===1?"certa":d.frac===0?"errada":"parcial"}`,{ind:10,bold:true})}
+      if(q.tipo==="anexo"){const f=(d.r&&d.r.f)||[];txt(f.length?`${f.length} página(s) anexada(s)${d.r.ok?" · declarou que escreveu à mão":""}`:"Nenhum arquivo anexado",{ind:10});
+        f.forEach((id,k)=>{const a=ANX.get(id);if(!a)return;let iw=LW,ih=iw*a.h/a.w;const maxH=H-100;if(ih>maxH){ih=maxH;iw=ih*a.w/a.h}doc.addPage();y=50;txt(`${l.aluno.nome} · página ${k+1} de ${f.length}`,{size:9,cor:[91,102,114]});doc.addImage(a.dados,"JPEG",M+(LW-iw)/2,y,iw,ih,undefined,"FAST");y+=ih+8})}
       if(q.tipo==="forca")d.g.forEach((w,k)=>{const x=forcaRes(w,(d.r||[])[k]);txt(`Palavra ${k+1}: ${w} | ${x.venceu?"descobriu":"não descobriu"} | letras: ${x.letras||"-"} | erros: ${x.erros}`,{ind:10,cor:x.venceu?[47,122,74]:[166,58,50]})});
       y+=6;
     });
